@@ -81,7 +81,7 @@ class DashboardViewModel: ObservableObject {
 
     func refreshEmailAlerts() async {
         print("📧 [DashboardViewModel] Refreshing email alerts...")
-        isLoading = true
+        // No loading spinner - background refresh only
 
         do {
             // Check for cancellation before expensive operation
@@ -108,8 +108,6 @@ class DashboardViewModel: ObservableObject {
             print("❌ [DashboardViewModel] Failed to refresh alerts: \(error)")
             errorMessage = "Failed to refresh email alerts: \(error.localizedDescription)"
         }
-
-        isLoading = false
     }
 
     func refreshData() async {
@@ -170,5 +168,27 @@ class DashboardViewModel: ObservableObject {
         // Tasks are managed by the views that call the async methods
         // This method is here for completeness but actual cancellation
         // happens when the Task objects in the views are cancelled
+    }
+
+    // MARK: - Synchronous Updates (for instant UI refresh)
+
+    func updateBudgetsSync() {
+        print("⚡ [DashboardViewModel] Synchronous budget update with local data")
+
+        // Update budgets with current transactions (synchronous, instant)
+        budgetService.updateBudgets(with: storageService.transactions)
+
+        // Update category spending for new budget system
+        budgetService.updateCategorySpending(with: storageService.transactions)
+
+        // Update snapshots for historical tracking
+        if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+            snapshotService.updateSnapshotsIfNeeded(
+                monthlyTakeHome: monthlyTakeHome,
+                transactions: storageService.transactions
+            )
+        }
+
+        print("✅ [DashboardViewModel] Synchronous update complete")
     }
 }

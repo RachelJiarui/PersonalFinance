@@ -12,18 +12,13 @@ struct DashboardView: View {
                 VStack(spacing: 24) {
                     HeaderView()
 
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .padding()
+                    // Always show content, never show loading spinner
+                    if let allocation = BudgetService.shared.budgetAllocation,
+                       let income = BudgetService.shared.userIncome {
+                        BudgetRingsSection(allocation: allocation, income: income)
                     } else {
-                        // New percentage-based budget section
-                        if let allocation = BudgetService.shared.budgetAllocation,
-                           let income = BudgetService.shared.userIncome {
-                            BudgetRingsSection(allocation: allocation, income: income)
-                        } else {
-                            // Prompt to set up budget
-                            EmptyBudgetView()
-                        }
+                        // Prompt to set up budget
+                        EmptyBudgetView()
                     }
                 }
                 .padding()
@@ -77,9 +72,13 @@ struct DashboardView: View {
             await viewModel.refreshData()
         }
         .task {
+            // Load initial data in background without blocking UI
             dashboardTask = Task {
                 await viewModel.refreshData()
             }
+
+            // Update budget immediately with existing local data
+            viewModel.updateBudgetsSync()
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {

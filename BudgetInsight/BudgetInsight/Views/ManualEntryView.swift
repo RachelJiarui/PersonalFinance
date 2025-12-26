@@ -230,6 +230,18 @@ struct ManualEntryView: View {
             storageService.linkAlert(id: alertId, toTransactionId: transaction.id)
         }
 
+        // Immediately update budgets synchronously (instant UI update)
+        budgetService.updateBudgets(with: storageService.transactions)
+        budgetService.updateCategorySpending(with: storageService.transactions)
+
+        // Update snapshots
+        if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+            SnapshotService.shared.updateSnapshotsIfNeeded(
+                monthlyTakeHome: monthlyTakeHome,
+                transactions: storageService.transactions
+            )
+        }
+
         print("✅ [ManualEntry] Saved transaction: \(merchant) - $\(amountValue)")
 
         // Dismiss view
