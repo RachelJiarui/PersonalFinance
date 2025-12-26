@@ -3,14 +3,22 @@ import Foundation
 class BudgetService: ObservableObject {
     static let shared = BudgetService()
 
-    @Published var budgets: [Budget] = []
+    @Published var budgets: [Budget] = []  // Legacy budgets (backward compatibility)
     @Published var spendingSummary: SpendingSummary?
+
+    // New percentage-based budget system
+    @Published var budgetAllocation: BudgetAllocation?
+    @Published var userIncome: UserIncome?
 
     private let userDefaults = UserDefaults.standard
     private let budgetsKey = "saved_budgets"
+    private let allocationKey = "budget_allocation"
+    private let incomeKey = "user_income"
 
     private init() {
         loadBudgets()
+        loadBudgetAllocation()
+        loadUserIncome()
     }
 
     func calculateSpendingSummary(transactions: [Transaction]) -> SpendingSummary {
@@ -145,6 +153,125 @@ class BudgetService: ObservableObject {
             budgets = decoded
         } else {
             createDefaultBudgets()
+        }
+    }
+
+    // MARK: - New User Income Management
+
+    func updateUserIncome(annualSalary: Double, contribution401k: Double) {
+        let calculatedIncome = TaxService.shared.calculateAllTaxes(
+            annualSalary: annualSalary,
+            contribution401k: contribution401k
+        )
+
+        self.userIncome = calculatedIncome
+        saveUserIncome()
+
+        // Trigger UI update
+        objectWillChange.send()
+    }
+
+    // MARK: - New Budget Allocation Management
+
+    func createCategory(name: String, percentage: Double, icon: String, color: String) {
+        var allocation = budgetAllocation ?? BudgetAllocation(categories: [], emergencyBufferId: UUID())
+
+        let newCategory = BudgetCategory(
+            id: UUID(),
+            name: name,
+            percentage: percentage,
+            icon: icon,
+            color: color,
+            currentMonthSpent: 0
+        )
+
+        allocation.categories.append(newCategory)
+        self.budgetAllocation = allocation
+        saveBudgetAllocation()
+    }
+
+    func updateCategoryPercentage(categoryId: UUID, newPercentage: Double) {
+        guard var allocation = budgetAllocation else { return }
+
+        if let index = allocation.categories.firstIndex(where: { $0.id == categoryId }) {
+            allocation.categories[index].percentage = newPercentage
+            self.budgetAllocation = allocation
+            saveBudgetAllocation()
+        }
+    }
+
+    func deleteCategory(categoryId: UUID) {
+        guard var allocation = budgetAllocation else { return }
+
+        allocation.categories.removeAll { $0.id == categoryId }
+        self.budgetAllocation = allocation
+        saveBudgetAllocation()
+    }
+
+    func validateAllocation() -> Bool {
+        guard let allocation = budgetAllocation else { return false }
+        return allocation.isValid
+    }
+
+    // Update spending for percentage-based categories
+    func updateCategorySpending(with transactions: [Transaction]) {
+        guard var allocation = budgetAllocation else { return }
+
+        let calendar = Calendar.current
+        let now = Date()
+        let currentMonth = calendar.component(.month, from: now)
+        let currentYear = calendar.component(.year, from: now)
+
+        // Reset all spending
+        for index in allocation.categories.indices {
+            allocation.categories[index].currentMonthSpent = 0
+        }
+
+        // Calculate current month spending per category
+        let currentMonthTransactions = transactions.filter { transaction in
+            let month = calendar.component(.month, from: transaction.date)
+            let year = calendar.component(.year, from: transaction.date)
+            return month == currentMonth && year == currentYear && transaction.isExpense
+        }
+
+        for transaction in currentMonthTransactions {
+            let categoryName = transaction.primaryCategory
+
+            // Find matching budget category by name
+            if let index = allocation.categories.firstIndex(where: { $0.name == categoryName }) {
+                allocation.categories[index].currentMonthSpent += transaction.amount
+            }
+        }
+
+        self.budgetAllocation = allocation
+        saveBudgetAllocation()
+    }
+
+    // MARK: - New Persistence Methods
+
+    private func saveBudgetAllocation() {
+        if let encoded = try? JSONEncoder().encode(budgetAllocation) {
+            userDefaults.set(encoded, forKey: allocationKey)
+        }
+    }
+
+    private func loadBudgetAllocation() {
+        if let data = userDefaults.data(forKey: allocationKey),
+           let decoded = try? JSONDecoder().decode(BudgetAllocation.self, from: data) {
+            budgetAllocation = decoded
+        }
+    }
+
+    private func saveUserIncome() {
+        if let encoded = try? JSONEncoder().encode(userIncome) {
+            userDefaults.set(encoded, forKey: incomeKey)
+        }
+    }
+
+    private func loadUserIncome() {
+        if let data = userDefaults.data(forKey: incomeKey),
+           let decoded = try? JSONDecoder().decode(UserIncome.self, from: data) {
+            userIncome = decoded
         }
     }
 }

@@ -16,6 +16,7 @@ class DashboardViewModel: ObservableObject {
     private let emailService = EmailService.shared
     private let storageService = TransactionStorageService.shared
     private let budgetService = BudgetService.shared
+    private let snapshotService = SnapshotService.shared
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -124,6 +125,17 @@ class DashboardViewModel: ObservableObject {
 
             // Update budgets with current transactions
             budgetService.updateBudgets(with: storageService.transactions)
+
+            // Update category spending for new budget system
+            budgetService.updateCategorySpending(with: storageService.transactions)
+
+            // Update snapshots for historical tracking
+            if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+                snapshotService.updateSnapshotsIfNeeded(
+                    monthlyTakeHome: monthlyTakeHome,
+                    transactions: storageService.transactions
+                )
+            }
 
             print("🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions, \(unlinkedAlertsCount) alerts need entry\n")
         } catch is CancellationError {

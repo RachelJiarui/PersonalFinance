@@ -1,32 +1,36 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = DashboardViewModel()
+    @StateObject private var dashboardViewModel = DashboardViewModel()
+    @StateObject private var budgetViewModel = BudgetViewModel()
+    @StateObject private var historyViewModel = HistoryViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var refreshTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationView {
-            if viewModel.isEmailConnected {
-                DashboardView()
-                    .environmentObject(viewModel)
+        Group {
+            if dashboardViewModel.isEmailConnected {
+                MainTabView()
+                    .environmentObject(dashboardViewModel)
+                    .environmentObject(budgetViewModel)
+                    .environmentObject(historyViewModel)
             } else {
-                EmailSetupView()
+                NavigationView {
+                    EmailSetupView()
+                }
             }
         }
         .onChange(of: scenePhase) { newPhase in
             handleScenePhaseChange(newPhase)
         }
         .task {
-            if viewModel.isEmailConnected {
-                // Store task reference for cancellation
+            if dashboardViewModel.isEmailConnected {
                 refreshTask = Task {
-                    await viewModel.refreshData()
+                    await dashboardViewModel.refreshData()
                 }
             }
         }
         .onDisappear {
-            // Cancel refresh task when view disappears
             refreshTask?.cancel()
             refreshTask = nil
         }
@@ -36,23 +40,20 @@ struct ContentView: View {
         switch phase {
         case .active:
             print("🔄 [ContentView] App became active")
-            // Optionally refresh data when app comes to foreground
-            if viewModel.isEmailConnected {
+            if dashboardViewModel.isEmailConnected {
                 Task {
-                    await viewModel.refreshData()
+                    await dashboardViewModel.refreshData()
                 }
             }
 
         case .inactive:
             print("⏸️ [ContentView] App became inactive")
-            // Cancel ongoing tasks
             refreshTask?.cancel()
 
         case .background:
             print("📴 [ContentView] App went to background")
-            // Cancel all tasks immediately to prevent SIGTERM
             refreshTask?.cancel()
-            viewModel.cancelAllTasks()
+            dashboardViewModel.cancelAllTasks()
 
         @unknown default:
             break
