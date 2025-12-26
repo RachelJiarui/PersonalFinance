@@ -19,7 +19,7 @@
 		1A00003A /* CategoryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000016; };
 		1A00003B /* SpendingInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000018; };
 		1A00003C /* TransactionAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000042; };
-		1A00004A /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000043; };
+		1A00003D /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000043; };
 		1A00003E /* TransactionStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000044; };
 		1A00003F /* EmailSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000045; };
 		1A000040 /* ManualEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000048; };
@@ -212,7 +212,7 @@
 				1A00003A /* CategoryCard.swift in Sources */,
 				1A00003B /* SpendingInsights.swift in Sources */,
 				1A00003C /* TransactionAlert.swift in Sources */,
-				1A00004A /* EmailService.swift in Sources */,
+				1A00003D /* EmailService.swift in Sources */,
 				1A00003E /* TransactionStorageService.swift in Sources */,
 				1A00003F /* EmailSetupView.swift in Sources */,
 				1A000040 /* ManualEntryView.swift in Sources */,

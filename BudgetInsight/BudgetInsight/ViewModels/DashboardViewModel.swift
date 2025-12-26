@@ -7,36 +7,54 @@ class DashboardViewModel: ObservableObject {
     @Published var insights: [SpendingInsight] = []
     @Published var spendingSummary: SpendingSummary?
     @Published var isLoading: Bool = false
-    @Published var isConnected: Bool = false
-    @Published var setupToken: String = ""
-    @Published var showingSetupAlert: Bool = false
+    @Published var isEmailConnected: Bool = false
+    @Published var transactions: [Transaction] = []
+    @Published var transactionAlerts: [TransactionAlert] = []
+    @Published var unlinkedAlertsCount: Int = 0
     @Published var errorMessage: String?
 
-    private let simpleFinService = SimpleFinService.shared
+    private let emailService = EmailService.shared
+    private let storageService = TransactionStorageService.shared
     private let budgetService = BudgetService.shared
     private var cancellables = Set<AnyCancellable>()
 
     init() {
         setupSubscriptions()
-        checkConnectionStatus()
+        checkEmailConnection()
+        loadLocalData()
     }
 
     private func setupSubscriptions() {
-        simpleFinService.$isConnected
-            .assign(to: &$isConnected)
+        // Email connection status
+        emailService.$isAuthenticated
+            .assign(to: &$isEmailConnected)
 
-        simpleFinService.$isLoading
-            .assign(to: &$isLoading)
+        // Storage service transactions
+        storageService.$transactions
+            .assign(to: &$transactions)
 
+        // Storage service alerts
+        storageService.$transactionAlerts
+            .assign(to: &$transactionAlerts)
+
+        // Budget service
         budgetService.$budgets
             .assign(to: &$budgets)
 
         budgetService.$spendingSummary
             .assign(to: &$spendingSummary)
 
+        // Update unlinked alerts count whenever alerts change
+        storageService.$transactionAlerts
+            .map { alerts in
+                alerts.filter { !$0.isLinked }.count
+            }
+            .assign(to: &$unlinkedAlertsCount)
+
+        // Generate insights when budgets, transactions, or summary change
         Publishers.CombineLatest3(
             budgetService.$budgets,
-            simpleFinService.$transactions,
+            storageService.$transactions,
             budgetService.$spendingSummary
         )
         .sink { [weak self] budgets, transactions, summary in
@@ -50,43 +68,68 @@ class DashboardViewModel: ObservableObject {
         .store(in: &cancellables)
     }
 
-    func checkConnectionStatus() {
-        isConnected = simpleFinService.isConnected
+    func checkEmailConnection() {
+        isEmailConnected = emailService.isAuthenticated
     }
 
-    func connectToSimpleFin() {
-        showingSetupAlert = true
+    func loadLocalData() {
+        // Data is automatically loaded via storageService subscriptions
+        // Update budgets with loaded transactions
+        budgetService.updateBudgets(with: storageService.transactions)
     }
 
-    func claimSetupToken() {
-        guard !setupToken.isEmpty else {
-            errorMessage = "Please enter a setup token"
-            return
-        }
+    func refreshEmailAlerts() async {
+        print("📧 [DashboardViewModel] Refreshing email alerts...")
+        isLoading = true
 
-        Task {
-            do {
-                try await simpleFinService.claimSetupToken(setupToken)
-                showingSetupAlert = false
-                setupToken = ""
-                await refreshData()
-            } catch {
-                errorMessage = "Failed to claim token: \(error.localizedDescription)"
-                print("Failed to claim token: \(error)")
+        do {
+            let newAlerts = try await emailService.pollForNewAlerts()
+
+            // Save new alerts that don't already exist
+            for alert in newAlerts {
+                if !storageService.transactionAlerts.contains(where: { $0.emailId == alert.emailId }) {
+                    storageService.saveTransactionAlert(alert)
+                }
             }
+
+            print("✅ [DashboardViewModel] Found \(newAlerts.count) new alerts")
+        } catch {
+            print("❌ [DashboardViewModel] Failed to refresh alerts: \(error)")
+            errorMessage = "Failed to refresh email alerts: \(error.localizedDescription)"
         }
+
+        isLoading = false
     }
 
     func refreshData() async {
-        print("\n🔄 [DashboardViewModel] refreshData() called")
-        await simpleFinService.syncTransactions()
-        print("🔄 [DashboardViewModel] Synced \(simpleFinService.transactions.count) transactions from SimpleFin")
-        budgetService.updateBudgets(with: simpleFinService.transactions)
-        print("🔄 [DashboardViewModel] refreshData() complete\n")
+        print("\n�� [DashboardViewModel] refreshData() called")
+
+        // Refresh email alerts
+        await refreshEmailAlerts()
+
+        // Update budgets with current transactions
+        budgetService.updateBudgets(with: storageService.transactions)
+
+        print("🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions, \(unlinkedAlertsCount) alerts need entry\n")
+    }
+
+    func createManualEntry(transaction: Transaction, linkedAlertId: String?) {
+        // Save transaction
+        storageService.saveTransaction(transaction)
+
+        // Link to alert if provided
+        if let alertId = linkedAlertId {
+            storageService.linkAlert(id: alertId, toTransactionId: transaction.id)
+        }
+
+        // Update budgets
+        budgetService.updateBudgets(with: storageService.transactions)
+
+        print("✅ [DashboardViewModel] Created manual entry: \(transaction.merchantName ?? "Unknown")")
     }
 
     func disconnect() {
-        simpleFinService.disconnect()
+        emailService.disconnect()
         budgetService.createDefaultBudgets()
     }
 }

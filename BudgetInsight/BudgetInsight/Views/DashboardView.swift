@@ -2,24 +2,54 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
+    @State private var showManualEntry = false
+    @State private var showNeedsEntry = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                HeaderView()
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(spacing: 24) {
+                    HeaderView()
 
-                if viewModel.isLoading {
-                    ProgressView()
-                        .padding()
-                } else {
-                    if let summary = viewModel.spendingSummary {
-                        SummaryCard(summary: summary)
+                    // MARK: - Needs Entry Section
+                    if viewModel.unlinkedAlertsCount > 0 {
+                        NeedsEntryBanner(count: viewModel.unlinkedAlertsCount) {
+                            showNeedsEntry = true
+                        }
                     }
 
-                    InsightsSection(insights: viewModel.insights)
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .padding()
+                    } else {
+                        if let summary = viewModel.spendingSummary {
+                            SummaryCard(summary: summary)
+                        }
 
-                    BudgetSection(budgets: viewModel.budgets)
+                        InsightsSection(insights: viewModel.insights)
+
+                        BudgetSection(budgets: viewModel.budgets)
+                    }
                 }
+                .padding()
+                .padding(.bottom, 80) // Space for FAB
+            }
+
+            // MARK: - Floating Action Button
+            Button(action: {
+                showManualEntry = true
+            }) {
+                HStack {
+                    Image(systemName: "plus")
+                    Text("Add Transaction")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(25)
+                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
             }
             .padding()
         }
@@ -50,6 +80,12 @@ struct DashboardView: View {
         }
         .task {
             await viewModel.refreshData()
+        }
+        .sheet(isPresented: $showManualEntry) {
+            ManualEntryView()
+        }
+        .sheet(isPresented: $showNeedsEntry) {
+            NeedsEntryView()
         }
     }
 }
@@ -227,5 +263,43 @@ struct BudgetSection: View {
                 CategoryCard(budget: budget)
             }
         }
+    }
+}
+
+struct NeedsEntryBanner: View {
+    let count: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "envelope.badge.fill")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Needs Entry")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("\(count) transaction alert\(count == 1 ? "" : "s") waiting")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }

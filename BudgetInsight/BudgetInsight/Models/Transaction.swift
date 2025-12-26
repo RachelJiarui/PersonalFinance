@@ -9,6 +9,10 @@ struct Transaction: Identifiable, Codable {
     let category: [String]
     let pending: Bool
 
+    // Manual entry fields
+    let linkedEmailAlertId: String?  // Links to TransactionAlert when matched
+    let isManualEntry: Bool  // True if manually entered, false if from external API
+
     var primaryCategory: String {
         category.first ?? "Other"
     }
