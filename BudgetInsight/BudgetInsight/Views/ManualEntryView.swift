@@ -3,12 +3,13 @@ import SwiftUI
 struct ManualEntryView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var storageService = TransactionStorageService.shared
+    @StateObject private var budgetService = BudgetService.shared
 
     // Form fields
     @State private var amount: String = ""
     @State private var merchant: String = ""
     @State private var date: Date = Date()
-    @State private var category: TransactionCategory = .other
+    @State private var selectedCategoryName: String = ""
     @State private var notes: String = ""
 
     // Matching
@@ -48,13 +49,24 @@ struct ManualEntryView: View {
                         }
 
                     // Category
-                    Picker("Category", selection: $category) {
-                        ForEach(TransactionCategory.allCases, id: \.self) { cat in
-                            HStack {
-                                Image(systemName: cat.icon)
-                                Text(cat.rawValue)
+                    Picker("Category", selection: $selectedCategoryName) {
+                        if let allocation = budgetService.budgetAllocation {
+                            ForEach(allocation.categories) { cat in
+                                HStack {
+                                    Image(systemName: cat.icon)
+                                    Text(cat.name)
+                                }
+                                .tag(cat.name)
                             }
-                            .tag(cat)
+                        } else {
+                            // Fallback to old categories if no custom budget set
+                            ForEach(TransactionCategory.allCases, id: \.self) { cat in
+                                HStack {
+                                    Image(systemName: cat.icon)
+                                    Text(cat.rawValue)
+                                }
+                                .tag(cat.rawValue)
+                            }
                         }
                     }
 
@@ -144,6 +156,14 @@ struct ManualEntryView: View {
                 Text(errorMessage)
             }
             .onAppear {
+                // Set default category
+                if let allocation = budgetService.budgetAllocation,
+                   let firstCategory = allocation.categories.first {
+                    selectedCategoryName = firstCategory.name
+                } else if let firstOldCategory = TransactionCategory.allCases.first {
+                    selectedCategoryName = firstOldCategory.rawValue
+                }
+
                 // Pre-fill if alert was provided
                 if let alert = prefilledAlert {
                     amount = String(format: "%.2f", alert.amount)
@@ -196,7 +216,7 @@ struct ManualEntryView: View {
             amount: amountValue,
             date: date,
             merchantName: merchant,
-            category: [category.rawValue],
+            category: [selectedCategoryName],
             pending: false,
             linkedEmailAlertId: selectedAlertId,
             isManualEntry: true
