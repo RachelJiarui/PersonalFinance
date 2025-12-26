@@ -161,11 +161,11 @@ class SimpleFinService: ObservableObject {
         return Transaction(
             id: sfTransaction.id,
             accountId: accountId,
-            amount: abs(Double(sfTransaction.amount) / 10000.0),
+            amount: abs(Double(sfTransaction.amount) ?? 0.0),
             date: Date(timeIntervalSince1970: TimeInterval(sfTransaction.posted)),
             merchantName: sfTransaction.description,
             category: categories,
-            pending: sfTransaction.pending
+            pending: sfTransaction.pending ?? false
         )
     }
 
@@ -267,12 +267,12 @@ struct SimpleFinAccount: Codable, Identifiable {
 struct SimpleFinTransaction: Codable, Identifiable {
     let id: String
     let posted: Int
-    let amount: Int
+    let amount: String
     let description: String
-    let pending: Bool
+    let pending: Bool?
     let memo: String?
 
     var amountInDollars: Double {
-        Double(amount) / 10000.0
+        Double(amount) ?? 0.0
     }
 }
