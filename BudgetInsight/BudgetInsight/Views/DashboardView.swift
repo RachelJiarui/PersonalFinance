@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var showManualEntry = false
+    @State private var showNeedsEntry = false
     @State private var dashboardTask: Task<Void, Never>?
 
     var body: some View {
@@ -11,6 +12,13 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     HeaderView()
+
+                    // MARK: - Needs Entry Section
+                    if viewModel.unlinkedAlertsCount > 0 {
+                        NeedsEntryBanner(count: viewModel.unlinkedAlertsCount) {
+                            showNeedsEntry = true
+                        }
+                    }
 
                     // Always show content, never show loading spinner
                     if let allocation = BudgetService.shared.budgetAllocation,
@@ -56,6 +64,15 @@ struct DashboardView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
 
+                    Button(action: {
+                        dashboardTask?.cancel()
+                        dashboardTask = Task {
+                            await viewModel.fetchOneEmailAlert()
+                        }
+                    }) {
+                        Label("Fetch Email Alert (Test)", systemImage: "envelope.arrow.triangle.branch")
+                    }
+
                     Button(role: .destructive, action: {
                         dashboardTask?.cancel()
                         viewModel.disconnect()
@@ -92,6 +109,47 @@ struct DashboardView: View {
         .sheet(isPresented: $showManualEntry) {
             ManualEntryView()
         }
+        .sheet(isPresented: $showNeedsEntry) {
+            NeedsEntryView()
+        }
+    }
+}
+
+struct NeedsEntryBanner: View {
+    let count: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "envelope.badge.fill")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Needs Entry")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("\(count) transaction alert\(count == 1 ? "" : "s") waiting")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -191,4 +191,38 @@ class DashboardViewModel: ObservableObject {
 
         print("✅ [DashboardViewModel] Synchronous update complete")
     }
+
+    // MARK: - Test Function: Fetch One Email Alert
+
+    func fetchOneEmailAlert() async {
+        print("📧 [DashboardViewModel] Fetching one email alert for testing...")
+
+        do {
+            try Task.checkCancellation()
+
+            // Fetch alerts from Gmail
+            let newAlerts = try await emailService.pollForNewAlerts()
+
+            try Task.checkCancellation()
+
+            // Save just the first one for testing
+            if let firstAlert = newAlerts.first {
+                // Check if it already exists
+                if !storageService.transactionAlerts.contains(where: { $0.emailId == firstAlert.emailId }) {
+                    storageService.saveTransactionAlert(firstAlert)
+                    print("✅ [DashboardViewModel] Saved test alert: \(firstAlert.merchant) - $\(firstAlert.amount)")
+                } else {
+                    print("ℹ️ [DashboardViewModel] Alert already exists")
+                }
+            } else {
+                print("ℹ️ [DashboardViewModel] No new alerts found")
+            }
+
+        } catch is CancellationError {
+            print("⏹️ [DashboardViewModel] Fetch cancelled")
+        } catch {
+            print("❌ [DashboardViewModel] Failed to fetch alert: \(error)")
+            errorMessage = "Failed to fetch email alert: \(error.localizedDescription)"
+        }
+    }
 }
