@@ -2,8 +2,10 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showManualEntry = false
     @State private var showNeedsEntry = false
+    @State private var dashboardTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -58,7 +60,8 @@ struct DashboardView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(action: {
-                        Task {
+                        dashboardTask?.cancel()
+                        dashboardTask = Task {
                             await viewModel.refreshData()
                         }
                     }) {
@@ -66,6 +69,7 @@ struct DashboardView: View {
                     }
 
                     Button(role: .destructive, action: {
+                        dashboardTask?.cancel()
                         viewModel.disconnect()
                     }) {
                         Label("Disconnect", systemImage: "xmark.circle")
@@ -76,10 +80,23 @@ struct DashboardView: View {
             }
         }
         .refreshable {
+            dashboardTask?.cancel()
             await viewModel.refreshData()
         }
         .task {
-            await viewModel.refreshData()
+            dashboardTask = Task {
+                await viewModel.refreshData()
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .background {
+                // Cancel tasks when backgrounding
+                dashboardTask?.cancel()
+            }
+        }
+        .onDisappear {
+            dashboardTask?.cancel()
+            dashboardTask = nil
         }
         .sheet(isPresented: $showManualEntry) {
             ManualEntryView()

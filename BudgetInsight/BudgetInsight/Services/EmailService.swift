@@ -5,11 +5,15 @@ import UIKit
 
 /// Handles Gmail API integration for monitoring Discover transaction alert emails
 /// Uses OAuth 2.0 for authentication and polls for new transaction alerts
+@MainActor
 class EmailService: NSObject, ObservableObject {
     static let shared = EmailService()
 
     @Published var isAuthenticated: Bool = false
     @Published var isPolling: Bool = false
+
+    // Store active OAuth session to prevent deallocation
+    private var activeAuthSession: ASWebAuthenticationSession?
 
     private var accessToken: String?
     private var refreshToken: String?
@@ -25,9 +29,24 @@ class EmailService: NSObject, ObservableObject {
     private let discoverEmailAddress = "discover@services.discover.com"
     private let transactionAlertSubject = "Transaction Alert"
 
+    // Configure URLSession with timeouts to prevent hangs
+    private lazy var urlSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        config.waitsForConnectivity = true
+        return URLSession(configuration: config)
+    }()
+
     private override init() {
         super.init()
         loadTokensFromKeychain()
+    }
+
+    deinit {
+        activeAuthSession?.cancel()
+        activeAuthSession = nil
+        print("🗑️ [EmailService] Deallocated")
     }
 
     // MARK: - Authentication
@@ -53,28 +72,40 @@ class EmailService: NSObject, ObservableObject {
         print("📧 [EmailService] Opening OAuth URL: \(authURL)")
 
         // Use ASWebAuthenticationSession for OAuth flow
-        let callbackURL = try await withCheckedThrowingContinuation { @Sendable (continuation: CheckedContinuation<URL, Error>) in
+        // CRITICAL: Store session as strong reference to prevent deallocation
+        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(
                 url: authURL,
                 callbackURLScheme: "com.googleusercontent.apps.575183170824-u52q55tqf9epn33rp7u2ujej5q33skvd"
-            ) { @Sendable callbackURL, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
+            ) { callbackURL, error in
+                // CRITICAL: Resume continuation on main actor without nested dispatch
+                Task { @MainActor in
+                    // Clear the session reference
+                    self.activeAuthSession = nil
 
-                guard let callbackURL = callbackURL else {
-                    continuation.resume(throwing: EmailServiceError.invalidResponse)
-                    return
-                }
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
 
-                continuation.resume(returning: callbackURL)
+                    guard let callbackURL = callbackURL else {
+                        continuation.resume(throwing: EmailServiceError.invalidResponse)
+                        return
+                    }
+
+                    continuation.resume(returning: callbackURL)
+                }
             }
 
-            DispatchQueue.main.async {
-                session.presentationContextProvider = self
-                session.prefersEphemeralWebBrowserSession = false
-                session.start()
+            // Store session as strong reference BEFORE starting
+            self.activeAuthSession = session
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+
+            // Start session immediately - NO dispatch wrapper needed (already on MainActor)
+            if !session.start() {
+                self.activeAuthSession = nil
+                continuation.resume(throwing: EmailServiceError.invalidResponse)
             }
         }
 
@@ -109,7 +140,7 @@ class EmailService: NSObject, ObservableObject {
         let bodyString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
         request.httpBody = bodyString.data(using: .utf8)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -128,9 +159,8 @@ class EmailService: NSObject, ObservableObject {
         // Save to keychain
         try saveTokensToKeychain()
 
-        await MainActor.run {
-            self.isAuthenticated = true
-        }
+        // Update published property (already on MainActor)
+        self.isAuthenticated = true
 
         print("✅ [EmailService] Successfully authenticated with Gmail")
     }
@@ -157,7 +187,7 @@ class EmailService: NSObject, ObservableObject {
         let bodyString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
         request.httpBody = bodyString.data(using: .utf8)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -193,6 +223,9 @@ class EmailService: NSObject, ObservableObject {
     func pollForNewAlerts() async throws -> [TransactionAlert] {
         print("📧 [EmailService] Polling for new transaction alerts...")
 
+        // Check for cancellation before expensive operation
+        try Task.checkCancellation()
+
         try await ensureValidToken()
 
         guard let accessToken = accessToken else {
@@ -209,7 +242,9 @@ class EmailService: NSObject, ObservableObject {
         var request = URLRequest(url: listURL)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        try Task.checkCancellation()
+
+        let (data, response) = try await urlSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -230,10 +265,15 @@ class EmailService: NSObject, ObservableObject {
         var alerts: [TransactionAlert] = []
 
         for message in messages {
+            // Check for cancellation in loop
+            try Task.checkCancellation()
+
             do {
                 if let alert = try await fetchAndParseEmail(messageId: message.id, accessToken: accessToken) {
                     alerts.append(alert)
                 }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 print("⚠️ [EmailService] Failed to parse email \(message.id): \(error)")
                 continue
@@ -251,7 +291,7 @@ class EmailService: NSObject, ObservableObject {
         var request = URLRequest(url: messageURL)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await urlSession.data(for: request)
         let message = try JSONDecoder().decode(GmailMessage.self, from: data)
 
         // Extract email body (handle both plain text and HTML)

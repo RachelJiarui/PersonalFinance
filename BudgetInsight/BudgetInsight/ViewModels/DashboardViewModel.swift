@@ -83,16 +83,26 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
 
         do {
+            // Check for cancellation before expensive operation
+            try Task.checkCancellation()
+
             let newAlerts = try await emailService.pollForNewAlerts()
+
+            // Check cancellation before updating state
+            try Task.checkCancellation()
 
             // Save new alerts that don't already exist
             for alert in newAlerts {
+                try Task.checkCancellation() // Check in loop
+
                 if !storageService.transactionAlerts.contains(where: { $0.emailId == alert.emailId }) {
                     storageService.saveTransactionAlert(alert)
                 }
             }
 
             print("✅ [DashboardViewModel] Found \(newAlerts.count) new alerts")
+        } catch is CancellationError {
+            print("⏹️ [DashboardViewModel] Email refresh cancelled")
         } catch {
             print("❌ [DashboardViewModel] Failed to refresh alerts: \(error)")
             errorMessage = "Failed to refresh email alerts: \(error.localizedDescription)"
@@ -102,15 +112,25 @@ class DashboardViewModel: ObservableObject {
     }
 
     func refreshData() async {
-        print("\n�� [DashboardViewModel] refreshData() called")
+        print("\n🔄 [DashboardViewModel] refreshData() called")
 
-        // Refresh email alerts
-        await refreshEmailAlerts()
+        do {
+            try Task.checkCancellation()
 
-        // Update budgets with current transactions
-        budgetService.updateBudgets(with: storageService.transactions)
+            // Refresh email alerts
+            await refreshEmailAlerts()
 
-        print("🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions, \(unlinkedAlertsCount) alerts need entry\n")
+            try Task.checkCancellation()
+
+            // Update budgets with current transactions
+            budgetService.updateBudgets(with: storageService.transactions)
+
+            print("🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions, \(unlinkedAlertsCount) alerts need entry\n")
+        } catch is CancellationError {
+            print("⏹️ [DashboardViewModel] Refresh cancelled")
+        } catch {
+            print("❌ [DashboardViewModel] Refresh error: \(error)")
+        }
     }
 
     func createManualEntry(transaction: Transaction, linkedAlertId: String?) {
@@ -131,5 +151,12 @@ class DashboardViewModel: ObservableObject {
     func disconnect() {
         emailService.disconnect()
         budgetService.createDefaultBudgets()
+    }
+
+    func cancelAllTasks() {
+        print("🛑 [DashboardViewModel] Cancelling all active tasks")
+        // Tasks are managed by the views that call the async methods
+        // This method is here for completeness but actual cancellation
+        // happens when the Task objects in the views are cancelled
     }
 }
