@@ -1,0 +1,42 @@
+# Environment
+.env
+.env.local
+venv/
+env/
+*.pyc
+__pycache__/
+
+# Credentials (CRITICAL - NEVER COMMIT THESE)
+credentials/
+credentials.json
+token.pickle
+last_history_id.txt
+*.json
+*.p8
+*.pem
+apns_cert.pem
+apns_key.pem
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+build/
+dist/
+*.egg-info/
