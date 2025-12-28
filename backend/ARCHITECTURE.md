@@ -130,8 +130,7 @@
   date: DateTime,
   category: [String],
   pending: Boolean,
-  is_manual_entry: Boolean,
-  linked_email_alert_id: String,
+  linked_email_alert_id: String, // null if manually created, otherwise email alert ID
   created_at: DateTime
 }
 ```

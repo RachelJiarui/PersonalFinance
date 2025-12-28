@@ -20,7 +20,7 @@ google-api-python-client==2.111.0
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
-pydantic==2.5.3
+pydantic>=2.5.3
 cryptography==41.0.7
 
 # Development
