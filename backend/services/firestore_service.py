@@ -1,60 +1,248 @@
 """
-Firestore Service for BudgetInsight
-Handles all database operations with Google Cloud Firestore
+Firestore Service for BudgetInsight (Single-User Refactored)
+Handles all database operations for rachel.j.chen@gmail.com
 """
 
 import os
 from datetime import datetime
+from typing import Dict, List, Optional
 
 from google.cloud import firestore
 
 
 class FirestoreService:
+    """Single-user Firestore service - all data belongs to rachel.j.chen@gmail.com"""
+
     def __init__(self):
         """Initialize Firestore client"""
-        # Firestore uses GOOGLE_APPLICATION_CREDENTIALS env variable automatically
         self.db = firestore.Client()
-        print("✅ Connected to Firestore")
+        self.user_email = "rachel.j.chen@gmail.com"
+        print(f"✅ Connected to Firestore (single-user mode: {self.user_email})")
 
     # ========================================================================
-    # USER MANAGEMENT
+    # APP SETTINGS
     # ========================================================================
 
-    def create_user(self, user_data):
-        """Create a new user"""
-        user_id = user_data["user_id"]
-        user_data["created_at"] = firestore.SERVER_TIMESTAMP
-        user_data["updated_at"] = firestore.SERVER_TIMESTAMP
-        self.db.collection("users").document(user_id).set(user_data)
-        return user_id
-
-    def get_user_by_email(self, email):
-        """Get user by email"""
-        users = (
-            self.db.collection("users").where("email", "==", email).limit(1).stream()
-        )
-        for user in users:
-            return user.to_dict()
-        return None
-
-    def get_user_by_id(self, user_id):
-        """Get user by user_id"""
-        doc = self.db.collection("users").document(user_id).get()
+    def get_settings(self) -> Dict:
+        """Get app settings including user profile"""
+        doc = self.db.collection("app_settings").document("user_profile").get()
         if doc.exists:
             return doc.to_dict()
-        return None
+        return {
+            "email": self.user_email,
+            "device_tokens": [],
+            "last_history_id": None,
+        }
 
-    def update_user_history_id(self, user_id, history_id):
-        """Update user's last processed history ID"""
-        self.db.collection("users").document(user_id).update(
+    def update_device_token(self, device_token: str):
+        """Add device token for push notifications"""
+        self.db.collection("app_settings").document("user_profile").set(
+            {
+                "email": self.user_email,
+                "device_tokens": firestore.ArrayUnion([device_token]),
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+
+    def update_history_id(self, history_id: str):
+        """Update Gmail last processed history ID"""
+        self.db.collection("app_settings").document("user_profile").update(
             {"last_history_id": history_id, "updated_at": firestore.SERVER_TIMESTAMP}
         )
 
-    def add_device_token(self, user_id, device_token):
-        """Add device token to user (for push notifications)"""
-        self.db.collection("users").document(user_id).update(
+    def get_device_tokens(self) -> List[str]:
+        """Get all device tokens for push notifications"""
+        settings = self.get_settings()
+        return settings.get("device_tokens", [])
+
+    # ========================================================================
+    # BUDGET CATEGORIES
+    # ========================================================================
+
+    def get_budget_categories(self, include_inactive: bool = False) -> List[Dict]:
+        """
+        Get budget categories
+
+        Args:
+            include_inactive: If True, returns all categories. If False, only active ones.
+        """
+        query = self.db.collection("budget_categories")
+
+        if not include_inactive:
+            query = query.where("is_active", "==", True)
+
+        categories = query.stream()
+        return [{"id": cat.id, **cat.to_dict()} for cat in categories]
+
+    def get_budget_category(self, category_id: str) -> Optional[Dict]:
+        """Get a specific budget category"""
+        doc = self.db.collection("budget_categories").document(category_id).get()
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_budget_category(self, category_data: Dict) -> str:
+        """
+        Create a new budget category - Firestore auto-generates ID
+
+        Expected fields:
+        - name: str
+        - percentage: float (0-100)
+        - icon: str (SF Symbol name)
+        - is_active: bool (default True)
+        """
+        category_data["created_at"] = firestore.SERVER_TIMESTAMP
+        category_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        category_data["is_active"] = category_data.get("is_active", True)
+
+        # Remove id if present - let Firestore generate it
+        category_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("budget_categories").add(category_data)
+        return doc_ref.id
+
+    def update_budget_category(self, category_id: str, updates: Dict):
+        """
+        Update a budget category (only if is_active = True)
+        Once is_active = False, category becomes immutable for historical data integrity
+        """
+        # Check if category is active
+        category = self.get_budget_category(category_id)
+        if not category:
+            raise ValueError(f"Category {category_id} not found")
+
+        if not category.get("is_active", True):
+            raise ValueError(
+                f"Cannot update inactive category {category_id}. Inactive categories are immutable."
+            )
+
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("budget_categories").document(category_id).update(updates)
+
+    def deactivate_budget_category(self, category_id: str):
+        """
+        Deactivate a budget category (makes it immutable)
+        Historical transactions will still reference this category by UUID
+        """
+        self.db.collection("budget_categories").document(category_id).update(
+            {"is_active": False, "updated_at": firestore.SERVER_TIMESTAMP}
+        )
+
+    def delete_budget_category(self, category_id: str):
+        """
+        Delete a budget category (use with caution - prefer deactivation)
+        This should only be used if category has no associated transactions
+        """
+        self.db.collection("budget_categories").document(category_id).delete()
+
+    # ========================================================================
+    # TRANSACTIONS
+    # ========================================================================
+
+    def get_transactions(
+        self,
+        category_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 1000,
+    ) -> List[Dict]:
+        """
+        Get transactions with optional filtering
+
+        Args:
+            category_id: Filter by budget category UUID
+            start_date: ISO8601 date string (inclusive)
+            end_date: ISO8601 date string (inclusive)
+            limit: Maximum number of transactions
+        """
+        query = self.db.collection("transactions")
+
+        if category_id:
+            query = query.where("category_id", "==", category_id)
+
+        if start_date:
+            query = query.where("date", ">=", start_date)
+
+        if end_date:
+            query = query.where("date", "<=", end_date)
+
+        transactions = (
+            query.order_by("date", direction=firestore.Query.DESCENDING)
+            .limit(limit)
+            .stream()
+        )
+        return [{"id": tx.id, **tx.to_dict()} for tx in transactions]
+
+    def get_transaction(self, transaction_id: str) -> Optional[Dict]:
+        """Get a specific transaction"""
+        doc = self.db.collection("transactions").document(transaction_id).get()
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_transaction(self, transaction_data: Dict) -> str:
+        """
+        Create a new transaction
+
+        Expected fields:
+        - id: str (UUID)
+        - amount: float
+        - date: str (ISO8601)
+        - title: str
+        - category_id: str (BudgetCategory UUID)
+        - is_expense: bool
+        - timestamp: str (ISO8601, defaults to now)
+        - linked_email_alert_id: str | null (optional)
+        """
+        transaction_data["created_at"] = firestore.SERVER_TIMESTAMP
+        transaction_data["updated_at"] = firestore.SERVER_TIMESTAMP
+
+        # Set timestamp if not provided
+        if "timestamp" not in transaction_data:
+            transaction_data["timestamp"] = datetime.now().isoformat()
+
+        # Remove id if present - let Firestore generate it
+        transaction_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("transactions").add(transaction_data)
+        return doc_ref.id
+
+    def update_transaction(self, transaction_id: str, updates: Dict):
+        """Update a transaction"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("transactions").document(transaction_id).update(updates)
+
+    def delete_transaction(self, transaction_id: str):
+        """Delete a transaction and unlink any associated alert"""
+        # Get transaction to check for linked alert
+        transaction = self.get_transaction(transaction_id)
+        if transaction and transaction.get("linked_email_alert_id"):
+            # Unlink the alert
+            self.unlink_alert_from_transaction(transaction["linked_email_alert_id"])
+
+        # Delete the transaction
+        self.db.collection("transactions").document(transaction_id).delete()
+
+    def link_transaction_to_alert(self, transaction_id: str, alert_id: str):
+        """
+        Link a transaction to an alert (bidirectional)
+        Updates both Transaction.linkedEmailAlertId and TransactionAlert.linkedTransactionId
+        """
+        # Update transaction
+        self.db.collection("transactions").document(transaction_id).update(
             {
-                "device_tokens": firestore.ArrayUnion([device_token]),
+                "linked_email_alert_id": alert_id,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+        # Update alert
+        self.db.collection("transaction_alerts").document(alert_id).update(
+            {
+                "linked_transaction_id": transaction_id,
                 "updated_at": firestore.SERVER_TIMESTAMP,
             }
         )
@@ -63,278 +251,282 @@ class FirestoreService:
     # TRANSACTION ALERTS
     # ========================================================================
 
-    def save_transaction_alert(self, user_id, alert):
-        """Save a transaction alert from email"""
-        alert["user_id"] = user_id
-        alert["created_at"] = firestore.SERVER_TIMESTAMP
-        alert["is_linked"] = False
+    def get_transaction_alerts(
+        self, resolved: Optional[bool] = None, limit: int = 1000
+    ) -> List[Dict]:
+        """
+        Get transaction alerts
 
-        # Use email_id as document ID to prevent duplicates
-        doc_id = alert.get("email_id", None)
-        if doc_id:
-            self.db.collection("transaction_alerts").document(doc_id).set(alert)
-            return doc_id
-        else:
-            doc_ref = self.db.collection("transaction_alerts").add(alert)
-            return doc_ref[1].id
+        Args:
+            resolved: If True, get only resolved alerts. If False, only unresolved. If None, get all.
+            limit: Maximum number of alerts to return
+        """
+        query = self.db.collection("transaction_alerts")
 
-    def get_unlinked_alerts(self, user_id):
-        """Get all unlinked transaction alerts for a user"""
+        # Filter by resolved status (computed from linked_transaction_id)
+        if resolved is True:
+            query = query.where("linked_transaction_id", "!=", None)
+        elif resolved is False:
+            query = query.where("linked_transaction_id", "==", None)
+
         alerts = (
-            self.db.collection("transaction_alerts")
-            .where("user_id", "==", user_id)
-            .where("is_linked", "==", False)
-            .order_by("created_at", direction=firestore.Query.DESCENDING)
-            .stream()
-        )
-        return [{"id": alert.id, **alert.to_dict()} for alert in alerts]
-
-    def get_all_transaction_alerts(self, user_id, limit=1000):
-        """Get all transaction alerts for a user (linked + unlinked)"""
-        alerts = (
-            self.db.collection("transaction_alerts")
-            .where("user_id", "==", user_id)
-            .order_by("created_at", direction=firestore.Query.DESCENDING)
+            query.order_by("received_at", direction=firestore.Query.DESCENDING)
             .limit(limit)
             .stream()
         )
+
         return [{"id": alert.id, **alert.to_dict()} for alert in alerts]
 
-    def get_transaction_alert_by_id(self, alert_id):
-        """Get a single transaction alert by ID"""
+    def get_transaction_alert(self, alert_id: str) -> Optional[Dict]:
+        """Get a specific transaction alert"""
         doc = self.db.collection("transaction_alerts").document(alert_id).get()
         if doc.exists:
             return {"id": doc.id, **doc.to_dict()}
         return None
 
-    def link_alert(self, alert_id, transaction_id):
-        """Link an alert to a transaction"""
-        # Validate alert exists and is unlinked
-        alert = self.get_transaction_alert_by_id(alert_id)
-        if not alert:
-            raise ValueError(f"Alert {alert_id} not found")
-        if alert.get("is_linked"):
-            raise ValueError(f"Alert {alert_id} is already linked")
+    def create_transaction_alert(self, alert_data: Dict) -> str:
+        """
+        Create a transaction alert from email
 
-        self.db.collection("transaction_alerts").document(alert_id).update(
-            {
-                "is_linked": True,
-                "linked_transaction_id": transaction_id,
-                "linked_at": firestore.SERVER_TIMESTAMP,
-            }
+        Expected fields:
+        - id: str (UUID)
+        - email_id: str (Gmail message ID)
+        - merchant: str
+        - date: str (ISO8601)
+        - amount: float
+        - raw_email_body: str
+        - received_at: str (ISO8601, defaults to now)
+        - linked_transaction_id: str | null (optional)
+        """
+        alert_data["created_at"] = firestore.SERVER_TIMESTAMP
+        alert_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        alert_data["linked_transaction_id"] = alert_data.get(
+            "linked_transaction_id", None
         )
 
-    def unlink_alert(self, alert_id):
-        """Unlink an alert from its transaction"""
+        # Set received_at if not provided
+        if "received_at" not in alert_data:
+            alert_data["received_at"] = datetime.now().isoformat()
+
+        # Remove id if present - let Firestore generate it
+        alert_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("transaction_alerts").add(alert_data)
+        return doc_ref.id
+
+    def unlink_alert_from_transaction(self, alert_id: str):
+        """Unlink an alert from its transaction (bidirectional)"""
+        alert = self.get_transaction_alert(alert_id)
+        if alert and alert.get("linked_transaction_id"):
+            # Remove link from transaction
+            self.db.collection("transactions").document(
+                alert["linked_transaction_id"]
+            ).update(
+                {
+                    "linked_email_alert_id": None,
+                    "updated_at": firestore.SERVER_TIMESTAMP,
+                }
+            )
+
+        # Remove link from alert
         self.db.collection("transaction_alerts").document(alert_id).update(
             {
-                "is_linked": False,
                 "linked_transaction_id": None,
-                "unlinked_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
             }
         )
 
-    def delete_transaction_alert(self, alert_id):
-        """Delete a transaction alert"""
+    def delete_transaction_alert(self, alert_id: str):
+        """Delete a transaction alert and unlink from any transaction"""
+        # Get alert to check if it's linked
+        alert = self.get_transaction_alert(alert_id)
+        if alert and alert.get("linked_transaction_id"):
+            # Unlink from transaction first
+            self.db.collection("transactions").document(
+                alert["linked_transaction_id"]
+            ).update(
+                {
+                    "linked_email_alert_id": None,
+                    "updated_at": firestore.SERVER_TIMESTAMP,
+                }
+            )
+
+        # Delete the alert
         self.db.collection("transaction_alerts").document(alert_id).delete()
 
     # ========================================================================
-    # TRANSACTIONS
+    # BUDGET PLANS
     # ========================================================================
 
-    def save_transaction(self, transaction):
-        """Save a transaction"""
-        transaction["created_at"] = firestore.SERVER_TIMESTAMP
-        transaction["updated_at"] = firestore.SERVER_TIMESTAMP
+    def get_budget_plans(self, year: Optional[int] = None) -> List[Dict]:
+        """
+        Get budget plans
 
-        # Ensure linked_email_alert_id field exists (can be None)
-        if "linked_email_alert_id" not in transaction:
-            transaction["linked_email_alert_id"] = None
+        Args:
+            year: Filter by specific year. If None, returns all budget plans.
+        """
+        query = self.db.collection("budget_plans")
 
-        # Use transaction_id as document ID if provided
-        doc_id = transaction.get("transaction_id", None)
-        if doc_id:
-            self.db.collection("transactions").document(doc_id).set(transaction)
-            return doc_id
-        else:
-            doc_ref = self.db.collection("transactions").add(transaction)
-            return doc_ref[1].id
+        if year:
+            query = query.where("year", "==", year)
 
-    def get_user_transactions(self, user_id, limit=1000):
-        """Get all transactions for a user"""
-        transactions = (
-            self.db.collection("transactions")
-            .where("user_id", "==", user_id)
-            .order_by("date", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-            .stream()
-        )
-        return [{"id": tx.id, **tx.to_dict()} for tx in transactions]
+        plans = query.order_by("year", direction=firestore.Query.DESCENDING).stream()
+        return [{"id": plan.id, **plan.to_dict()} for plan in plans]
 
-    def get_transaction_by_id(self, transaction_id):
-        """Get a single transaction by ID"""
-        doc = self.db.collection("transactions").document(transaction_id).get()
+    def get_active_budget_plan(self) -> Optional[Dict]:
+        """Get the active budget plan (current year)"""
+        current_year = datetime.now().year
+        plans = self.get_budget_plans(year=current_year)
+        return plans[0] if plans else None
+
+    def get_budget_plan(self, plan_id: str) -> Optional[Dict]:
+        """Get a specific budget plan"""
+        doc = self.db.collection("budget_plans").document(plan_id).get()
         if doc.exists:
             return {"id": doc.id, **doc.to_dict()}
         return None
 
-    def update_transaction(self, transaction_id, update_data):
-        """Update a transaction"""
-        update_data["updated_at"] = firestore.SERVER_TIMESTAMP
-        self.db.collection("transactions").document(transaction_id).update(update_data)
-
-    def link_transaction_to_alert(self, transaction_id, alert_id):
-        """Link a transaction to an alert (bidirectional)"""
-        # Update transaction
-        self.db.collection("transactions").document(transaction_id).update(
-            {
-                "linked_email_alert_id": alert_id,
-                "updated_at": firestore.SERVER_TIMESTAMP,
-            }
-        )
-        # Update alert
-        self.link_alert(alert_id, transaction_id)
-
-    def unlink_transaction_from_alert(self, transaction_id, alert_id):
-        """Unlink a transaction from an alert (bidirectional)"""
-        # Update transaction
-        self.db.collection("transactions").document(transaction_id).update(
-            {
-                "linked_email_alert_id": None,
-                "updated_at": firestore.SERVER_TIMESTAMP,
-            }
-        )
-        # Update alert
-        self.unlink_alert(alert_id)
-
-    def delete_transaction(self, transaction_id):
-        """Delete a transaction"""
-        self.db.collection("transactions").document(transaction_id).delete()
-
-    def delete_transaction_with_cascade(self, transaction_id):
+    def create_budget_plan(self, plan_data: Dict) -> str:
         """
-        Delete a transaction and handle alert unlinking
+        Create a budget plan
 
-        If transaction is linked to an alert:
-        1. Unlink the alert (set is_linked=False)
-        2. Delete the transaction
-
-        This preserves the alert for potential future matching.
+        Expected fields:
+        - id: str (UUID)
+        - year: int
+        - annual_salary_gross: float
+        - user_income_id: str (UUID linking to UserIncome)
+        - category_ids: [str] (list of active BudgetCategory UUIDs)
         """
-        # Get transaction to check if linked
-        transaction = self.get_transaction_by_id(transaction_id)
-        if not transaction:
-            raise ValueError(f"Transaction {transaction_id} not found")
+        plan_data["created_at"] = firestore.SERVER_TIMESTAMP
+        plan_data["updated_at"] = firestore.SERVER_TIMESTAMP
 
-        # If linked to an alert, unlink it
-        linked_alert_id = transaction.get("linked_email_alert_id")
-        if linked_alert_id:
-            self.unlink_alert(linked_alert_id)
+        # Remove id if present - let Firestore generate it
+        plan_data.pop("id", None)
 
-        # Delete the transaction
-        self.db.collection("transactions").document(transaction_id).delete()
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("budget_plans").add(plan_data)
+        return doc_ref.id
+
+    def update_budget_plan(self, plan_id: str, updates: Dict):
+        """Update a budget plan"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("budget_plans").document(plan_id).update(updates)
+
+    def delete_budget_plan(self, plan_id: str):
+        """Delete a budget plan"""
+        self.db.collection("budget_plans").document(plan_id).delete()
 
     # ========================================================================
-    # BUDGET DATA (Simplified - just two documents per user)
+    # USER INCOME
     # ========================================================================
 
-    def save_user_budget(self, user_id, budget_data):
-        """Save or update user's budget allocation and income"""
-        budget_data["user_id"] = user_id
-        budget_data["updated_at"] = firestore.SERVER_TIMESTAMP
+    def get_user_incomes(self, year: Optional[int] = None) -> List[Dict]:
+        """
+        Get user income records
 
-        # Store in users/{user_id}/data/budget
-        self.db.collection("users").document(user_id).collection("data").document(
-            "budget"
-        ).set(budget_data, merge=True)
+        Args:
+            year: Filter by specific year. If None, returns all records.
+        """
+        query = self.db.collection("user_incomes")
 
-    def get_user_budget(self, user_id):
-        """Get user's budget allocation and income"""
-        doc = (
-            self.db.collection("users")
-            .document(user_id)
-            .collection("data")
-            .document("budget")
-            .get()
-        )
+        if year:
+            query = query.where("year", "==", year)
+
+        incomes = query.order_by("year", direction=firestore.Query.DESCENDING).stream()
+        return [{"id": income.id, **income.to_dict()} for income in incomes]
+
+    def get_user_income(self, income_id: str) -> Optional[Dict]:
+        """Get a specific user income record"""
+        doc = self.db.collection("user_incomes").document(income_id).get()
         if doc.exists:
-            return doc.to_dict()
-        return {}
+            return {"id": doc.id, **doc.to_dict()}
+        return None
 
-    def delete_user_budget(self, user_id):
-        """Delete user's entire budget"""
-        self.db.collection("users").document(user_id).collection("data").document(
-            "budget"
-        ).delete()
+    def create_user_income(self, income_data: Dict) -> str:
+        """
+        Create a user income record
 
-    def update_budget_categories(self, user_id, categories):
-        """Update only the budget categories"""
-        self.db.collection("users").document(user_id).collection("data").document(
-            "budget"
-        ).update({"categories": categories, "updated_at": firestore.SERVER_TIMESTAMP})
+        Expected fields:
+        - id: str (UUID)
+        - year: int
+        - annual_salary: float
+        - contribution_401k: float
+        - federal_tax: float
+        - social_security_tax: float
+        - medicare_tax: float
+        - ny_state_tax: float
+        - nyc_tax: float
+        """
+        income_data["created_at"] = firestore.SERVER_TIMESTAMP
+        income_data["updated_at"] = firestore.SERVER_TIMESTAMP
 
-    def update_budget_income(self, user_id, income_data):
-        """Update only the income fields"""
-        update_dict = {"updated_at": firestore.SERVER_TIMESTAMP}
+        # Remove id if present - let Firestore generate it
+        income_data.pop("id", None)
 
-        # Add income fields if provided
-        if "annual_salary" in income_data:
-            update_dict["annual_salary"] = income_data["annual_salary"]
-        if "contribution_401k" in income_data:
-            update_dict["contribution_401k"] = income_data["contribution_401k"]
-        if "monthly_take_home" in income_data:
-            update_dict["monthly_take_home"] = income_data["monthly_take_home"]
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("user_incomes").add(income_data)
+        return doc_ref.id
 
-        self.db.collection("users").document(user_id).collection("data").document(
-            "budget"
-        ).update(update_dict)
+    def update_user_income(self, income_id: str, updates: Dict):
+        """Update a user income record"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("user_incomes").document(income_id).update(updates)
+
+    def delete_user_income(self, income_id: str):
+        """Delete a user income record"""
+        self.db.collection("user_incomes").document(income_id).delete()
 
     # ========================================================================
-    # SNAPSHOTS (HISTORICAL DATA) - Optional for your use case
+    # SNAPSHOTS
     # ========================================================================
 
-    def save_snapshot(self, user_id, snapshot):
-        """Save a monthly or yearly snapshot"""
-        snapshot["user_id"] = user_id
-        snapshot["created_at"] = firestore.SERVER_TIMESTAMP
+    def get_snapshots(
+        self, period_type: str = "monthly", limit: int = 100
+    ) -> List[Dict]:
+        """
+        Get historical snapshots
 
-        # Create unique ID: user_id_year_month (or user_id_year for yearly)
-        if snapshot.get("month"):
-            doc_id = f"{user_id}_{snapshot['year']}_{snapshot['month']:02d}"
-        else:
-            doc_id = f"{user_id}_{snapshot['year']}"
+        Args:
+            period_type: 'monthly' or 'yearly'
+            limit: Maximum number of snapshots
+        """
+        query = self.db.collection("snapshots")
 
-        self.db.collection("snapshots").document(doc_id).set(snapshot, merge=True)
-        return doc_id
+        if period_type == "monthly":
+            query = query.where("month", "!=", None)
+        elif period_type == "yearly":
+            query = query.where("month", "==", None)
 
-    def get_snapshots(self, user_id, period_type="monthly", limit=100):
-        """Get snapshots for a user"""
         snapshots = (
-            self.db.collection("snapshots")
-            .where("user_id", "==", user_id)
-            .where("period_type", "==", period_type)
-            .order_by("year", direction=firestore.Query.DESCENDING)
+            query.order_by("year", direction=firestore.Query.DESCENDING)
+            .order_by("month", direction=firestore.Query.DESCENDING)
             .limit(limit)
             .stream()
         )
+
         return [{"id": snap.id, **snap.to_dict()} for snap in snapshots]
 
-    def get_snapshot_by_period(self, user_id, year, month=None):
-        """Get a specific snapshot by period"""
-        if month:
-            doc_id = f"{user_id}_{year}_{month:02d}"
-        else:
-            doc_id = f"{user_id}_{year}"
+    def create_snapshot(self, snapshot_data: Dict) -> str:
+        """
+        Create a snapshot
 
-        doc = self.db.collection("snapshots").document(doc_id).get()
-        if doc.exists:
-            return doc.to_dict()
-        return None
+        Expected fields:
+        - id: str (UUID)
+        - year: int
+        - month: int | null
+        - monthly_take_home: float
+        - total_spending: float
+        - savings: float
+        - transaction_count: int
+        - created_at: str (ISO8601)
+        """
+        snapshot_data["created_at"] = firestore.SERVER_TIMESTAMP
+        snapshot_data["updated_at"] = firestore.SERVER_TIMESTAMP
 
-    # ========================================================================
-    # CLEANUP
-    # ========================================================================
+        # Remove id if present - let Firestore generate it
+        snapshot_data.pop("id", None)
 
-    def close(self):
-        """Close Firestore connection (not needed, but kept for compatibility)"""
-        print("✅ Firestore connection closed")
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("snapshots").add(snapshot_data)
+        return doc_ref.id

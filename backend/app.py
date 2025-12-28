@@ -1,6 +1,6 @@
 """
-BudgetInsight Backend Server
-Flask API with Gmail Push Notifications, Firestore, and APNs
+BudgetInsight Backend Server (Single-User Refactored)
+Flask API for rachel.j.chen@gmail.com
 """
 
 import base64
@@ -12,10 +12,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from services.firestore_service import FirestoreService
-
-# Import services
 from services.gmail_service import GmailService
-from services.gmail_watch_manager import GmailWatchManager
 from services.pubsub_service import PubSubService
 from services.transaction_parser import TransactionParser
 
@@ -42,8 +39,6 @@ gmail_service = GmailService()
 pubsub_service = PubSubService()
 apns_service = APNsService() if APNS_AVAILABLE else None
 transaction_parser = TransactionParser()
-watch_manager = GmailWatchManager(db)
-
 
 # ============================================================================
 # HEALTH CHECK
@@ -57,6 +52,7 @@ def health_check():
         {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
+            "user": db.user_email,
             "services": {
                 "firestore": True,
                 "pubsub": pubsub_service.is_connected(),
@@ -66,22 +62,17 @@ def health_check():
 
 
 # ============================================================================
-# GMAIL PUSH NOTIFICATION WEBHOOK
+# GMAIL WEBHOOK (unchanged - still needed for email processing)
 # ============================================================================
 
 
 @app.route("/webhooks/gmail", methods=["POST"])
 def gmail_webhook():
-    """
-    Receives Gmail push notifications from Google Cloud Pub/Sub
-    This is called when new emails arrive in the user's Gmail
-    """
+    """Receives Gmail push notifications from Google Cloud Pub/Sub"""
     try:
-        # Verify the request is from Google
         if not pubsub_service.verify_push_request(request):
             return jsonify({"error": "Unauthorized"}), 401
 
-        # Parse Pub/Sub message
         envelope = request.get_json()
         if not envelope:
             return jsonify({"error": "No Pub/Sub message received"}), 400
@@ -90,22 +81,16 @@ def gmail_webhook():
         if not pubsub_message:
             return jsonify({"error": "Invalid Pub/Sub message"}), 400
 
-        # Decode the message data
         data = base64.b64decode(pubsub_message.get("data", "")).decode("utf-8")
         notification = json.loads(data)
 
-        print(f"📧 Received Gmail notification: {notification}")
-
-        # Extract user email and history ID
         email_address = notification.get("emailAddress")
         history_id = notification.get("historyId")
 
-        if not email_address or not history_id:
-            return jsonify({"error": "Missing email or historyId"}), 400
+        if email_address != db.user_email:
+            return jsonify({"error": "Unauthorized email"}), 403
 
-        # Process the notification
         process_gmail_notification(email_address, history_id)
-
         return jsonify({"success": True}), 200
 
     except Exception as e:
@@ -114,26 +99,17 @@ def gmail_webhook():
 
 
 def process_gmail_notification(email_address, history_id):
-    """
-    Process Gmail notification by fetching new messages and parsing transactions
-    """
+    """Process Gmail notification - parse emails and create alerts"""
     try:
-        # Get user's last processed history ID from database
-        user = db.get_user_by_email(email_address)
-        if not user:
-            print(f"⚠️ User not found: {email_address}")
-            return
+        settings = db.get_settings()
+        last_history_id = settings.get("last_history_id", history_id)
 
-        last_history_id = user.get("last_history_id", history_id)
-
-        # Fetch message history from Gmail
         messages = gmail_service.get_message_history(
             user_id=email_address, start_history_id=last_history_id
         )
 
         print(f"📬 Found {len(messages)} new messages")
 
-        # Filter for Discover transaction alerts
         discover_filter = os.getenv(
             "EMAIL_FROM_FILTER", "discover@services.discover.com"
         )
@@ -141,31 +117,17 @@ def process_gmail_notification(email_address, history_id):
 
         for message in messages:
             if gmail_service.is_from_sender(message, discover_filter):
-                # Parse transaction from email
                 alert = transaction_parser.parse_discover_email(message)
                 if alert:
                     transaction_alerts.append(alert)
-                    # Save to Firestore
-                    db.save_transaction_alert(user["user_id"], alert)
+                    db.create_transaction_alert(alert)
 
         print(f"💰 Parsed {len(transaction_alerts)} transaction alerts")
 
-        # Send push notifications to iOS app
-        if transaction_alerts:
-            device_tokens = user.get("device_tokens", [])
+        # Send push notifications
+        if transaction_alerts and apns_service:
+            device_tokens = db.get_device_tokens()
             for token in device_tokens:
-                # Prepare alert data for notification
-                alert_summaries = [
-                    {
-                        "id": alert.get("email_id"),
-                        "merchant": alert.get("merchant"),
-                        "amount": alert.get("amount"),
-                        "date": alert.get("date"),
-                    }
-                    for alert in transaction_alerts
-                ]
-
-                # Create descriptive body text
                 if len(transaction_alerts) == 1:
                     alert = transaction_alerts[0]
                     body = f"${alert.get('amount', 0):.2f} at {alert.get('merchant', 'Unknown')}"
@@ -175,23 +137,18 @@ def process_gmail_notification(email_address, history_id):
                         f"${total:.2f} total - {len(transaction_alerts)} transactions"
                     )
 
-                if apns_service:
-                    apns_service.send_notification(
-                        device_token=token,
-                        title="New Transaction Alert",
-                        body=body,
-                        badge=len(transaction_alerts),
-                        data={
-                            "type": "transaction_alert",
-                            "alert_count": len(transaction_alerts),
-                            "alerts": alert_summaries,
-                        },
-                    )
-                else:
-                    print("⚠️ APNs not available - skipping push notification")
+                apns_service.send_notification(
+                    device_token=token,
+                    title="New Transaction Alert",
+                    body=body,
+                    badge=len(transaction_alerts),
+                    data={
+                        "type": "transaction_alert",
+                        "alert_count": len(transaction_alerts),
+                    },
+                )
 
-        # Update user's last history ID
-        db.update_user_history_id(user["user_id"], history_id)
+        db.update_history_id(history_id)
 
     except Exception as e:
         print(f"❌ Error processing notification: {str(e)}")
@@ -199,65 +156,31 @@ def process_gmail_notification(email_address, history_id):
 
 
 # ============================================================================
-# USER MANAGEMENT API
+# APP SETTINGS
 # ============================================================================
 
 
-@app.route("/api/users/register", methods=["POST"])
-def register_user():
-    """Register a new user and set up Gmail watch"""
+@app.route("/api/settings", methods=["GET"])
+def get_settings():
+    """Get app settings"""
     try:
-        data = request.get_json()
-        user_id = data.get("user_id")
-        email = data.get("email")
-        device_token = data.get("device_token")
-        gmail_access_token = data.get("gmail_access_token")
-
-        if not all([user_id, email, device_token, gmail_access_token]):
-            return jsonify({"error": "Missing required fields"}), 400
-
-        # Save user to database
-        user_data = {
-            "user_id": user_id,
-            "email": email,
-            "device_tokens": [device_token],
-            "gmail_access_token": gmail_access_token,
-            "last_history_id": None,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-        }
-        db.create_user(user_data)
-
-        # Set up Gmail watch (push notifications)
-        watch_response = gmail_service.setup_watch(
-            user_id=email, access_token=gmail_access_token
-        )
-
-        return jsonify(
-            {
-                "success": True,
-                "user_id": user_id,
-                "watch_expiration": watch_response.get("expiration"),
-            }
-        ), 201
-
+        settings = db.get_settings()
+        return jsonify(settings), 200
     except Exception as e:
-        print(f"❌ Error registering user: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/device-token", methods=["PUT"])
-def update_device_token(user_id):
-    """Update user's device token for push notifications"""
+@app.route("/api/settings/device-token", methods=["POST"])
+def update_device_token():
+    """Register device token for push notifications"""
     try:
         data = request.get_json()
         device_token = data.get("device_token")
 
         if not device_token:
-            return jsonify({"error": "Missing device_token"}), 400
+            return jsonify({"error": "device_token required"}), 400
 
-        db.add_device_token(user_id, device_token)
-
+        db.update_device_token(device_token)
         return jsonify({"success": True}), 200
 
     except Exception as e:
@@ -265,246 +188,113 @@ def update_device_token(user_id):
 
 
 # ============================================================================
-# TRANSACTION ALERTS API
+# BUDGET CATEGORIES
 # ============================================================================
 
 
-@app.route("/api/users/<user_id>/transaction-alerts", methods=["GET"])
-def get_transaction_alerts(user_id):
-    """Get all transaction alerts for a user"""
+@app.route("/api/budget-categories", methods=["GET"])
+def get_budget_categories():
+    """Get all budget categories"""
     try:
-        # Query param: ?status=unlinked|linked|all (default: all)
-        status = request.args.get("status", "all")
-
-        if status == "unlinked":
-            alerts = db.get_unlinked_alerts(user_id)
-        elif status == "linked":
-            all_alerts = db.get_all_transaction_alerts(user_id)
-            alerts = [a for a in all_alerts if a.get("is_linked")]
-        else:
-            alerts = db.get_all_transaction_alerts(user_id)
-
-        return jsonify({"alerts": alerts}), 200
+        categories = db.get_budget_categories()
+        return jsonify({"categories": categories}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transaction-alerts/<alert_id>", methods=["GET"])
-def get_transaction_alert(user_id, alert_id):
-    """Get a single transaction alert"""
+@app.route("/api/budget-categories", methods=["POST"])
+def create_budget_category():
+    """Create a new budget category"""
     try:
-        alert = db.get_transaction_alert_by_id(alert_id)
-        if not alert:
-            return jsonify({"error": "Alert not found"}), 404
-
-        # Verify alert belongs to user
-        if alert.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        return jsonify(alert), 200
+        category_data = request.get_json()
+        category_id = db.create_budget_category(category_data)
+        return jsonify({"success": True, "id": category_id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transaction-alerts/<alert_id>", methods=["DELETE"])
-def delete_transaction_alert(user_id, alert_id):
-    """Delete a transaction alert"""
+@app.route("/api/budget-categories/<category_id>", methods=["PUT"])
+def update_budget_category(category_id):
+    """Update a budget category"""
     try:
-        # Get alert and verify ownership
-        alert = db.get_transaction_alert_by_id(alert_id)
-        if not alert:
-            return jsonify({"error": "Alert not found"}), 404
-
-        if alert.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        # If linked to a transaction, unlink it first
-        if alert.get("is_linked") and alert.get("linked_transaction_id"):
-            transaction_id = alert["linked_transaction_id"]
-            # Remove the reverse link from transaction
-            try:
-                db.update_transaction(transaction_id, {"linked_email_alert_id": None})
-            except:
-                pass  # Transaction might have been deleted already
-
-        # Delete the alert
-        db.delete_transaction_alert(alert_id)
-
+        updates = request.get_json()
+        db.update_budget_category(category_id, updates)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transaction-alerts/<alert_id>/unlink", methods=["PUT"])
-def unlink_transaction_alert(user_id, alert_id):
-    """Unlink an alert from its transaction"""
+@app.route("/api/budget-categories/<category_id>", methods=["DELETE"])
+def delete_budget_category(category_id):
+    """Delete a budget category"""
     try:
-        alert = db.get_transaction_alert_by_id(alert_id)
-        if not alert:
-            return jsonify({"error": "Alert not found"}), 404
-
-        if alert.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        if not alert.get("is_linked"):
-            return jsonify({"error": "Alert is not linked"}), 400
-
-        transaction_id = alert.get("linked_transaction_id")
-
-        # Unlink bidirectionally
-        if transaction_id:
-            db.unlink_transaction_from_alert(transaction_id, alert_id)
-        else:
-            # Fallback: just unlink the alert
-            db.unlink_alert(alert_id)
-
+        db.delete_budget_category(category_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ============================================================================
-# TRANSACTION DATA API
+# TRANSACTIONS
 # ============================================================================
 
 
-@app.route("/api/users/<user_id>/transactions", methods=["GET"])
-def get_transactions(user_id):
-    """Get all transactions for a user"""
+@app.route("/api/transactions", methods=["GET"])
+def get_transactions():
+    """Get all transactions"""
     try:
-        transactions = db.get_user_transactions(user_id)
+        transactions = db.get_transactions()
         return jsonify({"transactions": transactions}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transactions", methods=["POST"])
-def save_transaction(user_id):
-    """Save a transaction"""
+@app.route("/api/transactions", methods=["POST"])
+def create_transaction():
+    """Create a new transaction"""
     try:
-        transaction = request.get_json()
-        transaction["user_id"] = user_id
-        transaction["created_at"] = datetime.utcnow()
-
-        # Check if this transaction should be linked to an alert
-        linked_alert_id = transaction.get("linkedEmailAlertId")
-        if linked_alert_id:
-            # Save the alert ID in the proper field
-            transaction["linked_email_alert_id"] = linked_alert_id
-            # Remove the camelCase version
-            transaction.pop("linkedEmailAlertId", None)
-
-        transaction_id = db.save_transaction(transaction)
-
-        # If linked to an alert, link it bidirectionally
-        if linked_alert_id:
-            try:
-                db.link_alert(linked_alert_id, transaction_id)
-            except Exception as e:
-                print(f"Warning: Could not link alert {linked_alert_id}: {e}")
-
-        return jsonify({"success": True, "transaction_id": transaction_id}), 201
+        transaction_data = request.get_json()
+        transaction_id = db.create_transaction(transaction_data)
+        return jsonify({"success": True, "id": transaction_id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transactions/<transaction_id>", methods=["GET"])
-def get_transaction(user_id, transaction_id):
-    """Get a single transaction"""
+@app.route("/api/transactions/<transaction_id>", methods=["GET"])
+def get_transaction(transaction_id):
+    """Get a specific transaction"""
     try:
-        transaction = db.get_transaction_by_id(transaction_id)
+        transaction = db.get_transaction(transaction_id)
         if not transaction:
             return jsonify({"error": "Transaction not found"}), 404
-
-        # Verify transaction belongs to user
-        if transaction.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
         return jsonify(transaction), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transactions/<transaction_id>", methods=["PUT"])
-def update_transaction_endpoint(user_id, transaction_id):
-    """Update a transaction (full update)"""
+@app.route("/api/transactions/<transaction_id>", methods=["PUT"])
+def update_transaction(transaction_id):
+    """Update a transaction"""
     try:
-        # Get existing transaction
-        existing = db.get_transaction_by_id(transaction_id)
-        if not existing:
-            return jsonify({"error": "Transaction not found"}), 404
-
-        if existing.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        # Get update data
-        update_data = request.get_json()
-
-        # Don't allow changing user_id or id
-        update_data.pop("user_id", None)
-        update_data.pop("id", None)
-        update_data.pop("transaction_id", None)
-
-        # Update transaction
-        db.update_transaction(transaction_id, update_data)
-
+        updates = request.get_json()
+        db.update_transaction(transaction_id, updates)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transactions/<transaction_id>", methods=["PATCH"])
-def partial_update_transaction(user_id, transaction_id):
-    """Partially update a transaction"""
+@app.route("/api/transactions/<transaction_id>", methods=["DELETE"])
+def delete_transaction(transaction_id):
+    """Delete a transaction"""
     try:
-        # Get existing transaction
-        existing = db.get_transaction_by_id(transaction_id)
-        if not existing:
-            return jsonify({"error": "Transaction not found"}), 404
-
-        if existing.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        # Get partial update data
-        update_data = request.get_json()
-
-        # Don't allow changing user_id or id
-        update_data.pop("user_id", None)
-        update_data.pop("id", None)
-        update_data.pop("transaction_id", None)
-
-        # Update transaction
-        db.update_transaction(transaction_id, update_data)
-
+        db.delete_transaction(transaction_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/transactions/<transaction_id>", methods=["DELETE"])
-def delete_transaction_endpoint(user_id, transaction_id):
-    """Delete a transaction with cascade handling"""
-    try:
-        # Get transaction
-        transaction = db.get_transaction_by_id(transaction_id)
-        if not transaction:
-            return jsonify({"error": "Transaction not found"}), 404
-
-        if transaction.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
-
-        # Delete with cascade (handles alert unlinking)
-        db.delete_transaction_with_cascade(transaction_id)
-
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route(
-    "/api/users/<user_id>/transactions/<transaction_id>/link-alert", methods=["PUT"]
-)
-def link_transaction_to_alert_endpoint(user_id, transaction_id):
+@app.route("/api/transactions/<transaction_id>/link-alert", methods=["PUT"])
+def link_transaction_to_alert(transaction_id):
     """Link a transaction to an alert"""
     try:
         data = request.get_json()
@@ -513,191 +303,206 @@ def link_transaction_to_alert_endpoint(user_id, transaction_id):
         if not alert_id:
             return jsonify({"error": "alert_id required"}), 400
 
-        # Verify transaction ownership
-        transaction = db.get_transaction_by_id(transaction_id)
-        if not transaction:
-            return jsonify({"error": "Transaction not found"}), 404
-        if transaction.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
+        db.link_transaction_to_alert(transaction_id, alert_id)
+        return jsonify({"success": True}), 200
 
-        # Verify alert ownership
-        alert = db.get_transaction_alert_by_id(alert_id)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# TRANSACTION ALERTS
+# ============================================================================
+
+
+@app.route("/api/transaction-alerts", methods=["GET"])
+def get_transaction_alerts():
+    """Get transaction alerts (query param: ?status=all|linked|unlinked)"""
+    try:
+        status = request.args.get("status", "all")
+        alerts = db.get_transaction_alerts(status=status)
+        return jsonify({"alerts": alerts}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/transaction-alerts/<alert_id>", methods=["GET"])
+def get_transaction_alert(alert_id):
+    """Get a specific transaction alert"""
+    try:
+        alert = db.get_transaction_alert(alert_id)
         if not alert:
             return jsonify({"error": "Alert not found"}), 404
-        if alert.get("user_id") != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
+        return jsonify(alert), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        # Link bidirectionally
-        db.link_transaction_to_alert(transaction_id, alert_id)
 
+@app.route("/api/transaction-alerts/<alert_id>/unlink", methods=["PUT"])
+def unlink_alert(alert_id):
+    """Unlink an alert from its transaction"""
+    try:
+        db.unlink_alert(alert_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/transaction-alerts/<alert_id>", methods=["DELETE"])
+def delete_transaction_alert(alert_id):
+    """Delete a transaction alert"""
+    try:
+        db.delete_transaction_alert(alert_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ============================================================================
-# BUDGET DATA API
+# BUDGET PLANS
 # ============================================================================
 
 
-@app.route("/api/users/<user_id>/budget", methods=["GET"])
-def get_budget(user_id):
-    """Get user's budget allocation and income"""
+@app.route("/api/budget-plans", methods=["GET"])
+def get_budget_plans():
+    """Get budget plans (query param: ?year=YYYY)"""
     try:
-        budget = db.get_user_budget(user_id)
-        return jsonify(budget), 200
+        year = request.args.get("year")
+        year = int(year) if year else None
+        plans = db.get_budget_plans(year=year)
+        return jsonify({"plans": plans}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/budget", methods=["POST"])
-def save_budget(user_id):
-    """Save user's budget allocation and income"""
+@app.route("/api/budget-plans/active", methods=["GET"])
+def get_active_budget_plan():
+    """Get the active budget plan (current year)"""
     try:
-        budget_data = request.get_json()
-        budget_data["user_id"] = user_id
-        budget_data["updated_at"] = datetime.utcnow()
+        plan = db.get_active_budget_plan()
+        if not plan:
+            return jsonify({"error": "No active budget plan found"}), 404
+        return jsonify(plan), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        db.save_user_budget(user_id, budget_data)
 
+@app.route("/api/budget-plans", methods=["POST"])
+def create_budget_plan():
+    """Create a budget plan"""
+    try:
+        plan_data = request.get_json()
+        plan_id = db.create_budget_plan(plan_data)
+        return jsonify({"success": True, "id": plan_id}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/budget-plans/<plan_id>", methods=["PUT"])
+def update_budget_plan(plan_id):
+    """Update a budget plan"""
+    try:
+        updates = request.get_json()
+        db.update_budget_plan(plan_id, updates)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/budget", methods=["DELETE"])
-def delete_budget(user_id):
-    """Delete user's budget"""
+@app.route("/api/budget-plans/<plan_id>", methods=["DELETE"])
+def delete_budget_plan(plan_id):
+    """Delete a budget plan"""
     try:
-        db.delete_user_budget(user_id)
+        db.delete_budget_plan(plan_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/budget/categories", methods=["PATCH"])
-def update_budget_categories(user_id):
-    """Update only budget categories"""
+# ============================================================================
+# USER INCOME
+# ============================================================================
+
+
+@app.route("/api/user-incomes", methods=["GET"])
+def get_user_incomes():
+    """Get user income records (query param: ?year=YYYY)"""
     try:
-        data = request.get_json()
-        categories = data.get("categories")
-
-        if not categories:
-            return jsonify({"error": "categories required"}), 400
-
-        db.update_budget_categories(user_id, categories)
-        return jsonify({"success": True}), 200
+        year = request.args.get("year")
+        year = int(year) if year else None
+        incomes = db.get_user_incomes(year=year)
+        return jsonify({"incomes": incomes}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/users/<user_id>/budget/income", methods=["PATCH"])
-def update_budget_income(user_id):
-    """Update only budget income"""
+@app.route("/api/user-incomes/<income_id>", methods=["GET"])
+def get_user_income(income_id):
+    """Get a specific user income record"""
+    try:
+        income = db.get_user_income(income_id)
+        if not income:
+            return jsonify({"error": "Income record not found"}), 404
+        return jsonify(income), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-incomes", methods=["POST"])
+def create_user_income():
+    """Create a user income record"""
     try:
         income_data = request.get_json()
-        db.update_budget_income(user_id, income_data)
+        income_id = db.create_user_income(income_data)
+        return jsonify({"success": True, "id": income_id}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-incomes/<income_id>", methods=["PUT"])
+def update_user_income(income_id):
+    """Update a user income record"""
+    try:
+        updates = request.get_json()
+        db.update_user_income(income_id, updates)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-incomes/<income_id>", methods=["DELETE"])
+def delete_user_income(income_id):
+    """Delete a user income record"""
+    try:
+        db.delete_user_income(income_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ============================================================================
-# SNAPSHOTS API
+# SNAPSHOTS
 # ============================================================================
 
 
-@app.route("/api/users/<user_id>/snapshots", methods=["GET"])
-def get_snapshots(user_id):
-    """Get historical snapshots"""
+@app.route("/api/snapshots", methods=["GET"])
+def get_snapshots():
+    """Get snapshots (query param: ?type=monthly|yearly)"""
     try:
-        period_type = request.args.get("type", "monthly")  # monthly or yearly
-        snapshots = db.get_snapshots(user_id, period_type)
+        period_type = request.args.get("type", "monthly")
+        snapshots = db.get_snapshots(period_type=period_type)
         return jsonify({"snapshots": snapshots}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# ============================================================================
-# GMAIL WATCH AUTO-RENEWAL
-# ============================================================================
-
-
-@app.route("/tasks/renew-watches", methods=["POST"])
-def renew_watches():
-    """
-    Auto-renewal endpoint for Gmail watches
-
-    This endpoint should be called daily by Cloud Scheduler
-    It checks all active watches and renews any expiring in < 24 hours
-    """
+@app.route("/api/snapshots", methods=["POST"])
+def create_snapshot():
+    """Create a snapshot"""
     try:
-        # Verify this is from Cloud Scheduler (optional security)
-        # You can add authentication here if needed
-
-        print("🔄 [Scheduled Task] Gmail watch renewal check started")
-
-        # Check and renew watches
-        result = watch_manager.check_and_renew_watches()
-
-        return jsonify(
-            {
-                "success": True,
-                "timestamp": datetime.utcnow().isoformat(),
-                "summary": result,
-            }
-        ), 200
-
-    except Exception as e:
-        print(f"❌ Error in watch renewal task: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route("/api/users/<user_id>/gmail-watch/status", methods=["GET"])
-def get_watch_status(user_id):
-    """Get Gmail watch status for a user"""
-    try:
-        status = watch_manager.get_watch_status(user_id)
-        return jsonify(status), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/users/<user_id>/gmail-watch/setup", methods=["POST"])
-def setup_user_watch(user_id):
-    """
-    Set up Gmail watch for a user
-
-    Request body:
-    {
-        "access_token": "user's Gmail OAuth token"
-    }
-    """
-    try:
-        data = request.get_json()
-        access_token = data.get("access_token")
-
-        if not access_token:
-            return jsonify({"error": "access_token required"}), 400
-
-        # Get user email
-        user = db.get_user_by_id(user_id)
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        email = user.get("email")
-
-        # Set up watch
-        response = watch_manager.setup_watch(email, access_token)
-
-        return jsonify(
-            {
-                "success": True,
-                "history_id": response.get("historyId"),
-                "expiration": response.get("expiration"),
-            }
-        ), 200
-
+        snapshot_data = request.get_json()
+        snapshot_id = db.create_snapshot(snapshot_data)
+        return jsonify({"success": True, "id": snapshot_id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -711,7 +516,8 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     debug = os.getenv("FLASK_ENV") == "development"
 
-    print(f"🚀 Starting BudgetInsight Backend Server")
+    print(f"🚀 Starting BudgetInsight Backend Server (Single-User)")
+    print(f"   User: {db.user_email}")
     print(f"   Port: {port}")
     print(f"   Debug: {debug}")
 
