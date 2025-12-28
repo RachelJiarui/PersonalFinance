@@ -131,6 +131,13 @@ class TransactionStorageService: ObservableObject {
         // deleteAlertFromRemote(id)
     }
 
+    /// Clear all transaction alerts from local storage
+    func clearAllTransactionAlerts() {
+        transactionAlerts.removeAll()
+        persistTransactionAlerts()
+        print("🗑️ [StorageService] Cleared all transaction alerts from local storage")
+    }
+
     /// Persist transaction alerts to UserDefaults
     private func persistTransactionAlerts() {
         do {
@@ -168,34 +175,34 @@ class TransactionStorageService: ObservableObject {
         // POST /api/transactions
         // Send transaction to backend API
     }
-
+    
     private func syncTransactionsFromRemote() async {
         // GET /api/transactions
         // Fetch all transactions from backend
         // Merge with local storage (use server as source of truth)
     }
-
+    
     private func deleteTransactionFromRemote(_ id: String) async {
         // DELETE /api/transactions/{id}
         // Remove transaction from backend
     }
-
+    
     private func syncAlertToRemote(_ alert: TransactionAlert) async {
         // POST /api/transaction-alerts
         // Send alert to backend API
     }
-
+    
     private func syncAlertsFromRemote() async {
         // GET /api/transaction-alerts
         // Fetch all alerts from backend
         // Merge with local storage
     }
-
+    
     private func updateAlertLinkStatus(id: String, linkedToTransaction transactionId: String) async {
         // PATCH /api/transaction-alerts/{id}
         // Update isLinked status on backend
     }
-
+    
     private func deleteAlertFromRemote(_ id: String) async {
         // DELETE /api/transaction-alerts/{id}
         // Remove alert from backend

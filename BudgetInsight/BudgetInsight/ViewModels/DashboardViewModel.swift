@@ -71,38 +71,6 @@ class DashboardViewModel: ObservableObject {
         budgetService.updateCategorySpending(with: storageService.transactions)
     }
 
-    func refreshEmailAlerts() async {
-        print("📧 [DashboardViewModel] Refreshing email alerts...")
-        // No loading spinner - background refresh only
-
-        do {
-            // Check for cancellation before expensive operation
-            try Task.checkCancellation()
-
-            let newAlerts = try await emailService.pollForNewAlerts()
-
-            // Check cancellation before updating state
-            try Task.checkCancellation()
-
-            // Save new alerts that don't already exist
-            for alert in newAlerts {
-                try Task.checkCancellation()  // Check in loop
-
-                if !storageService.transactionAlerts.contains(where: { $0.emailId == alert.emailId }
-                ) {
-                    storageService.saveTransactionAlert(alert)
-                }
-            }
-
-            print("✅ [DashboardViewModel] Found \(newAlerts.count) new alerts")
-        } catch is CancellationError {
-            print("⏹️ [DashboardViewModel] Email refresh cancelled")
-        } catch {
-            print("❌ [DashboardViewModel] Failed to refresh alerts: \(error)")
-            errorMessage = "Failed to refresh email alerts: \(error.localizedDescription)"
-        }
-    }
-
     func refreshData() async {
         print("\n🔄 [DashboardViewModel] refreshData() called")
 
@@ -114,8 +82,8 @@ class DashboardViewModel: ObservableObject {
 
             try Task.checkCancellation()
 
-            // Refresh email alerts
-            await refreshEmailAlerts()
+            // Transaction alerts are now created via pub/sub notifications
+            // No need to poll Gmail directly - they come from Firestore
 
             try Task.checkCancellation()
 
