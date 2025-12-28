@@ -145,7 +145,7 @@ def process_gmail_notification(email_address, history_id):
                 alert = transaction_parser.parse_discover_email(message)
                 if alert:
                     transaction_alerts.append(alert)
-                    # Save to MongoDB
+                    # Save to Firestore
                     db.save_transaction_alert(user["user_id"], alert)
 
         print(f"💰 Parsed {len(transaction_alerts)} transaction alerts")

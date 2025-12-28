@@ -19,8 +19,8 @@
          │ (webhook)
          ↓
 ┌─────────────────┐      ┌─────────────┐
-│  Flask Server   │─────→│   MongoDB   │
-│  (Cloud Run)    │      │   (Atlas)   │
+│  Flask Server   │─────→│  Firestore  │
+│  (Cloud Run)    │      │             │
 └────────┬────────┘      └─────────────┘
          │ (push notification)
          ↓
@@ -45,7 +45,7 @@
 3. Pub/Sub sends webhook POST to /webhooks/gmail
 4. Server fetches email history from Gmail API
 5. Server parses transaction from email body
-6. Server saves transaction alert to MongoDB
+6. Server saves transaction alert to Firestore
 7. Server sends push notification to user's iOS device
 8. iOS app shows "Needs Entry" banner
 ```
@@ -59,7 +59,7 @@
    - email
    - device_token (APNs)
    - gmail_access_token
-3. Server saves user to MongoDB
+3. Server saves user to Firestore
 4. Server calls Gmail API to setup watch
 5. Gmail starts monitoring user's inbox
 ```
@@ -68,7 +68,7 @@
 
 ```
 1. iOS app sends transaction to POST /api/users/{user_id}/transactions
-2. Server saves to MongoDB
+2. Server saves to Firestore
 3. iOS app periodically fetches GET /api/users/{user_id}/transactions
 4. iOS app syncs budget data via POST /api/users/{user_id}/budget
 ```
@@ -88,97 +88,16 @@
 - `POST /api/users/{user_id}/budget` - Save budget
 - `GET /api/users/{user_id}/snapshots` - Get snapshots
 
-### MongoDB Collections
+### Firestore Collections
 
-**users**
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,
-  email: String,
-  device_tokens: [String],
-  gmail_access_token: String,
-  last_history_id: String,
-  created_at: DateTime,
-  updated_at: DateTime
-}
-```
+See [FIRESTORE_STRUCTURE.md](../FIRESTORE_STRUCTURE.md) for complete data structure documentation.
 
-**transaction_alerts**
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,
-  email_id: String,
-  merchant: String,
-  amount: Number,
-  date: DateTime,
-  raw_email_body: String,
-  is_linked: Boolean,
-  linked_transaction_id: String,
-  created_at: DateTime
-}
-```
-
-**transactions**
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,
-  amount: Number,
-  merchant: String,
-  date: DateTime,
-  category: [String],
-  pending: Boolean,
-  linked_email_alert_id: String, // null if manually created, otherwise email alert ID
-  created_at: DateTime
-}
-```
-
-**budgets**
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,
-  income: {
-    annualSalary: Number,
-    contribution401k: Number,
-    federalTax: Number,
-    socialSecurityTax: Number,
-    medicareTax: Number,
-    nyStateTax: Number,
-    nycTax: Number
-  },
-  allocation: {
-    categories: [{
-      id: String,
-      name: String,
-      percentage: Number,
-      icon: String,
-      color: String,
-      currentMonthSpent: Number
-    }],
-    emergencyBufferId: String
-  },
-  updated_at: DateTime
-}
-```
-
-**snapshots**
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,
-  year: Number,
-  month: Number, // null for yearly
-  period_type: String, // "monthly" or "yearly"
-  monthlyTakeHome: Number,
-  totalSpending: Number,
-  savings: Number,
-  transactionCount: Number,
-  created_at: DateTime
-}
-```
+**Summary:**
+- `users/{user_id}` - User profile and metadata
+- `users/{user_id}/data/budget` - Budget allocation and income
+- `transactions/{transaction_id}` - All spending transactions
+- `transaction_alerts/{alert_id}` - Email alerts from Gmail
+- `snapshots/{snapshot_id}` - Monthly/yearly aggregated data (optional)
 
 ### Services
 
@@ -194,9 +113,10 @@
 - `create_subscription()` - Create push subscription
 - `get_topic_path()` - Get topic path for Gmail watch
 
-**MongoDBService** (`services/mongodb_service.py`)
+**FirestoreService** (`services/firestore_service.py`)
 - User CRUD operations
 - Transaction CRUD operations
+- Transaction alert CRUD operations
 - Budget CRUD operations
 - Snapshot CRUD operations
 
@@ -218,14 +138,14 @@
 ### Data Protection
 
 1. **HTTPS Only**: All endpoints require HTTPS
-2. **Token Storage**: OAuth tokens encrypted in MongoDB
+2. **Token Storage**: OAuth tokens stored in Firestore
 3. **Pub/Sub Verification**: Verify webhook requests from Google
 4. **Rate Limiting**: Prevent API abuse (TODO)
 
 ### Privacy
 
 1. **Email Content**: Only store first 500 chars of email body
-2. **User Data**: Stored in user's own MongoDB instance
+2. **User Data**: Stored in Firestore with security rules
 3. **Token Expiry**: Gmail access tokens refreshed automatically
 
 ## Scaling
@@ -234,12 +154,12 @@
 
 - **Concurrent Users**: 100-1000
 - **Requests/Second**: ~100
-- **Database**: 512MB (free tier)
+- **Database**: 1GB storage, 50K reads/day (free tier)
 
 ### Scaling Strategy
 
 1. **Horizontal Scaling**: Cloud Run auto-scales instances
-2. **Database Sharding**: Use MongoDB sharding for 10k+ users
+2. **Database Scaling**: Firestore scales automatically
 3. **Caching**: Add Redis for frequently accessed data
 4. **CDN**: Use Cloud CDN for static assets
 5. **Load Balancing**: Cloud Run handles automatically
@@ -271,15 +191,14 @@
 
 **Estimate**: $5-15/month for 100 users
 
-### MongoDB Atlas
+### Firestore
 
-- Free Tier: $0 (512MB)
-- M2 Shared: $9/month (2GB)
-- M10 Dedicated: $57/month (10GB)
+- Free Tier: $0 (1GB storage, 50K reads/day, 20K writes/day)
+- Pay-as-you-go: $0.18/GB storage, $0.06 per 100K reads, $0.18 per 100K writes
 
-**Estimate**: $0-9/month for 100 users
+**Estimate**: $0/month for 100 users (well within free tier)
 
-### Total: $5-25/month
+### Total: $5-15/month
 
 ## Performance Targets
 
