@@ -33,6 +33,9 @@ Pods/
 *secret*
 *Secret*
 credentials.json
+oauth_credentials.json
+token.pickle
+last_history_id.txt
 
 # OS
 .DS_Store

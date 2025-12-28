@@ -59,19 +59,21 @@ def get_credentials():
             print("🔐 Starting OAuth flow...")
             print("    A browser window will open for Gmail authorization")
 
-            # Check for credentials.json
-            if not Path("credentials.json").exists():
-                print("\n❌ ERROR: credentials.json not found!")
+            # Check for oauth_credentials.json
+            if not Path("oauth_credentials.json").exists():
+                print("\n❌ ERROR: oauth_credentials.json not found!")
                 print(
                     "    Please download OAuth credentials from Google Cloud Console:"
                 )
-                print("    1. Go to console.cloud.google.com")
-                print("    2. APIs & Services → Credentials")
-                print("    3. Create OAuth 2.0 Client ID (Desktop app)")
-                print("    4. Download JSON and save as credentials.json")
+                print("    1. Go to console.cloud.google.com/apis/credentials")
+                print("    2. Create Credentials → OAuth 2.0 Client ID")
+                print("    3. Application type: Desktop app")
+                print("    4. Download JSON and save as oauth_credentials.json")
                 return None
 
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "oauth_credentials.json", SCOPES
+            )
             creds = flow.run_local_server(port=0)
 
         # Save credentials for future use
