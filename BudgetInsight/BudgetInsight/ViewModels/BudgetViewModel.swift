@@ -148,10 +148,10 @@ class BudgetViewModel: ObservableObject {
     func validateAllocation() {
         let (isValid, total) = budgetService.validateAllocation()
 
-        if !isValid && total > 100.01 {
+        if !isValid && total > 100 {
             validationError = "Total exceeds 100% by \(String(format: "%.1f", total - 100))%"
             isAllocationValid = false
-        } else if total < 99.99 {
+        } else if total < 100 {
             validationError =
                 "Total is \(String(format: "%.1f", total))% - consider allocating the remaining \(String(format: "%.1f", 100 - total))%"
             isAllocationValid = true  // It's valid, just a warning

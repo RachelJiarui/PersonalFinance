@@ -441,6 +441,22 @@ class BackendService: ObservableObject {
         return id
     }
 
+    func updateBudgetPlan(planId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/budget-plans/\(planId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
     // MARK: - User Income
 
     func fetchUserIncome(incomeId: String) async throws -> UserIncome? {
@@ -521,6 +537,22 @@ class BackendService: ObservableObject {
         }
 
         return id
+    }
+
+    func updateUserIncome(incomeId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/user-incomes/\(incomeId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
     }
 
     // MARK: - Snapshots
