@@ -86,10 +86,12 @@ firestore/
   "merchant": "Whole Foods",
   "category": "Food & Dining",
   "date": "2025-12-26T10:30:00Z",
-  "is_manual": false,
+  "linked_email_alert_id": "email_msg_123",
   "created_at": "2025-12-26T10:35:00Z"
 }
 ```
+
+**Note**: If `linked_email_alert_id` is `null`, the transaction was created manually. If it has a value, it was created from an email alert.
 
 **Indexes**:
 - `user_id` (for querying user's transactions)

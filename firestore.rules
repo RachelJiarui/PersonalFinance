@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is Rachel
+    function isRachel() {
+      return request.auth != null && request.auth.token.email == 'rachel.j.chen@gmail.com';
+    }
+
+    // Users collection - only Rachel can access
+    match /users/{userId} {
+      allow read, write: if isRachel();
+
+      // User's subcollections (budget data)
+      match /data/{document=**} {
+        allow read, write: if isRachel();
+      }
+    }
+
+    // Transactions - only Rachel can access
+    match /transactions/{transactionId} {
+      allow read, write: if isRachel();
+    }
+
+    // Transaction alerts - only Rachel can access
+    match /transaction_alerts/{alertId} {
+      allow read, write: if isRachel();
+    }
+
+    // Snapshots (if used) - only Rachel can access
+    match /snapshots/{snapshotId} {
+      allow read, write: if isRachel();
+    }
+  }
+}
