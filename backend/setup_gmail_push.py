@@ -103,7 +103,7 @@ def setup_gmail_watch(email, topic_name=None):
 
         # Get topic name from env or construct default
         if not topic_name:
-            project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "budgetinsight-backend")
+            project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "personal-finance-482417")
             topic_name = f"projects/{project_id}/topics/gmail-notifications"
 
         print(f"\n📧 Setting up Gmail push notifications...")
