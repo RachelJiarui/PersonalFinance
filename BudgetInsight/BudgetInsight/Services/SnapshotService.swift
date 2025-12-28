@@ -126,6 +126,38 @@ class SnapshotService: ObservableObject {
         )
     }
 
+    // MARK: - Manual Snapshot Management
+
+    func addSnapshot(_ snapshot: PeriodSnapshot) {
+        if let month = snapshot.month {
+            // Monthly snapshot
+            if let existingIndex = monthlySnapshots.firstIndex(where: {
+                $0.year == snapshot.year && $0.month == month
+            }) {
+                // Update existing snapshot only if the new one is more recent
+                if snapshot.createdAt > monthlySnapshots[existingIndex].createdAt {
+                    monthlySnapshots[existingIndex] = snapshot
+                }
+            } else {
+                // Add new snapshot
+                monthlySnapshots.append(snapshot)
+            }
+        } else {
+            // Yearly snapshot
+            if let existingIndex = yearlySnapshots.firstIndex(where: { $0.year == snapshot.year }) {
+                // Update existing snapshot only if the new one is more recent
+                if snapshot.createdAt > yearlySnapshots[existingIndex].createdAt {
+                    yearlySnapshots[existingIndex] = snapshot
+                }
+            } else {
+                // Add new snapshot
+                yearlySnapshots.append(snapshot)
+            }
+        }
+
+        saveSnapshots()
+    }
+
     // MARK: - Retrieval
 
     func getMonthlySnapshots(sortedByDate: Bool = true) -> [PeriodSnapshot] {

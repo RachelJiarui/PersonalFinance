@@ -1,64 +1,47 @@
-import Foundation
 import Combine
+import Foundation
 
 class BackendService: ObservableObject {
     static let shared = BackendService()
 
-    // TODO: Update this URL after deploying to Google Cloud Run
-    private let baseURL = "http://localhost:8080/api"
+    // Backend URL
+    private let baseURL: String
 
-    @Published var currentUserId: String?
-    @Published var isRegistered: Bool = false
+    @Published var isConnected: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
-        loadUserId()
+        // Try to get Cloud Run URL from environment or use production URL
+        if let cloudRunURL = ProcessInfo.processInfo.environment["BACKEND_URL"] {
+            self.baseURL = cloudRunURL
+        } else {
+            // Production Cloud Run URL
+            self.baseURL = "https://budgetinsight-backend-ofgbl6d3ea-uc.a.run.app/api"
+        }
     }
 
-    // MARK: - User Registration
+    // MARK: - Health Check
 
-    func registerUser(email: String, deviceToken: String? = nil) async throws -> String {
-        let url = URL(string: "\(baseURL)/users/register")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "email": email,
-            "device_token": deviceToken as Any
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
+    func checkHealth() async throws -> Bool {
+        let url = URL(string: "\(baseURL.replacingOccurrences(of: "/api", with: ""))/health")!
+        let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
+            httpResponse.statusCode == 200
+        else {
+            return false
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let userId = json["user_id"] as? String else {
-            throw BackendError.invalidData
-        }
-
-        await MainActor.run {
-            self.currentUserId = userId
-            self.isRegistered = true
-            self.saveUserId(userId)
-        }
-
-        return userId
+        return true
     }
 
-    func updateDeviceToken(_ token: String) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
+    // MARK: - Device Token
 
-        let url = URL(string: "\(baseURL)/users/\(userId)/device-token")!
+    func updateDeviceToken(_ token: String) async throws {
+        let url = URL(string: "\(baseURL)/settings/device-token")!
         var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = ["device_token": token]
@@ -67,125 +50,56 @@ class BackendService: ObservableObject {
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            httpResponse.statusCode == 200
+        else {
             throw BackendError.invalidResponse
         }
     }
 
-    // MARK: - Transaction Alerts
+    // MARK: - Transactions
 
-    func fetchTransactionAlerts(status: String = "all") async throws -> [TransactionAlert] {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transaction-alerts?status=\(status)")!
+    func fetchTransactions() async throws -> [Transaction] {
+        let url = URL(string: "\(baseURL)/transactions")!
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            httpResponse.statusCode == 200
+        else {
             throw BackendError.invalidResponse
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let alertsArray = json["alerts"] as? [[String: Any]] else {
+            let transactionsArray = json["transactions"] as? [[String: Any]]
+        else {
             throw BackendError.invalidData
         }
 
-        var alerts: [TransactionAlert] = []
-        for alertDict in alertsArray {
-            if let id = alertDict["id"] as? String,
-               let emailId = alertDict["email_id"] as? String,
-               let merchant = alertDict["merchant"] as? String,
-               let amount = alertDict["amount"] as? Double,
-               let dateString = alertDict["date"] as? String,
-               let date = ISO8601DateFormatter().date(from: dateString),
-               let rawEmailBody = alertDict["raw_email_body"] as? String {
-
-                let alert = TransactionAlert(
-                    id: id,
-                    emailId: emailId,
-                    merchant: merchant,
-                    date: date,
-                    amount: amount,
-                    rawEmailBody: rawEmailBody
-                )
-                alerts.append(alert)
-            }
-        }
-
-        return alerts
-    }
-
-    func deleteTransactionAlert(_ alertId: String) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transaction-alerts/\(alertId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    func unlinkTransactionAlert(_ alertId: String) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transaction-alerts/\(alertId)/unlink")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    // MARK: - Transaction Sync
-
-    func syncTransactions() async throws -> [Transaction] {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transactions")!
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let transactionsArray = json["transactions"] as? [[String: Any]] else {
-            throw BackendError.invalidData
-        }
-
+        let dateFormatter = ISO8601DateFormatter()
         var transactions: [Transaction] = []
-        for transactionDict in transactionsArray {
-            if let amount = transactionDict["amount"] as? Double,
-               let merchant = transactionDict["merchant"] as? String,
-               let dateString = transactionDict["date"] as? String,
-               let date = ISO8601DateFormatter().date(from: dateString) {
+
+        for dict in transactionsArray {
+            if let id = dict["id"] as? String,
+                let amount = dict["amount"] as? Double,
+                let title = dict["title"] as? String,
+                let categoryId = dict["category_id"] as? String,
+                let isExpense = dict["is_expense"] as? Bool,
+                let dateString = dict["date"] as? String,
+                let date = dateFormatter.date(from: dateString),
+                let timestampString = dict["timestamp"] as? String,
+                let timestamp = dateFormatter.date(from: timestampString)
+            {
+
+                let linkedEmailAlertId = dict["linked_email_alert_id"] as? String
 
                 let transaction = Transaction(
+                    id: id,
                     amount: amount,
-                    merchant: merchant,
                     date: date,
-                    category: .other
+                    title: title,
+                    categoryId: categoryId,
+                    isExpense: isExpense,
+                    timestamp: timestamp,
+                    linkedEmailAlertId: linkedEmailAlertId
                 )
                 transactions.append(transaction)
             }
@@ -194,12 +108,8 @@ class BackendService: ObservableObject {
         return transactions
     }
 
-    func uploadTransaction(_ transaction: Transaction) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transactions")!
+    func createTransaction(_ transaction: Transaction) async throws -> String {
+        let url = URL(string: "\(baseURL)/transactions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -207,67 +117,53 @@ class BackendService: ObservableObject {
         let dateFormatter = ISO8601DateFormatter()
         var body: [String: Any] = [
             "amount": transaction.amount,
-            "merchant": transaction.merchant,
-            "date": dateFormatter.string(from: transaction.date)
+            "title": transaction.title,
+            "category_id": transaction.categoryId,
+            "is_expense": transaction.isExpense,
+            "date": dateFormatter.string(from: transaction.date),
+            "timestamp": dateFormatter.string(from: transaction.timestamp),
         ]
 
-        // Add linked alert ID if present
         if let linkedAlertId = transaction.linkedEmailAlertId {
-            body["linkedEmailAlertId"] = linkedAlertId
+            body["linked_email_alert_id"] = linkedAlertId
         }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            (200...299).contains(httpResponse.statusCode)
+        else {
             throw BackendError.invalidResponse
         }
-    }
 
-    func updateTransaction(_ transactionId: String, updateData: [String: Any]) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
         }
 
-        let url = URL(string: "\(baseURL)/users/\(userId)/transactions/\(transactionId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: updateData)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
+        return id
     }
 
     func deleteTransaction(_ transactionId: String) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transactions/\(transactionId)")!
+        let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            httpResponse.statusCode == 200
+        else {
             throw BackendError.invalidResponse
         }
     }
 
     func linkTransactionToAlert(transactionId: String, alertId: String) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/transactions/\(transactionId)/link-alert")!
+        let url = URL(string: "\(baseURL)/transactions/\(transactionId)/link-alert")!
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -278,67 +174,213 @@ class BackendService: ObservableObject {
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            httpResponse.statusCode == 200
+        else {
             throw BackendError.invalidResponse
         }
     }
 
-    // MARK: - Budget Sync
+    // MARK: - Transaction Alerts
 
-    func syncBudget() async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
+    func fetchTransactionAlerts(resolved: Bool? = nil) async throws -> [TransactionAlert] {
+        var urlString = "\(baseURL)/transaction-alerts"
+        if let resolved = resolved {
+            let status = resolved ? "linked" : "unlinked"
+            urlString += "?status=\(status)"
         }
 
-        let budgetService = BudgetService.shared
-        guard let allocation = budgetService.budgetAllocation,
-              let income = budgetService.userIncome else {
-            return
+        let url = URL(string: urlString)!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
         }
 
-        let url = URL(string: "\(baseURL)/users/\(userId)/budget")!
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let alertsArray = json["alerts"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        var alerts: [TransactionAlert] = []
+
+        for dict in alertsArray {
+            if let id = dict["id"] as? String,
+                let emailId = dict["email_id"] as? String,
+                let merchant = dict["merchant"] as? String,
+                let amount = dict["amount"] as? Double,
+                let dateString = dict["date"] as? String,
+                let date = dateFormatter.date(from: dateString),
+                let rawEmailBody = dict["raw_email_body"] as? String,
+                let receivedAtString = dict["received_at"] as? String,
+                let receivedAt = dateFormatter.date(from: receivedAtString)
+            {
+
+                let linkedTransactionId = dict["linked_transaction_id"] as? String
+
+                let alert = TransactionAlert(
+                    id: id,
+                    emailId: emailId,
+                    merchant: merchant,
+                    date: date,
+                    amount: amount,
+                    rawEmailBody: rawEmailBody,
+                    receivedAt: receivedAt,
+                    linkedTransactionId: linkedTransactionId
+                )
+                alerts.append(alert)
+            }
+        }
+
+        return alerts
+    }
+
+    func deleteTransactionAlert(_ alertId: String) async throws {
+        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let categories = allocation.categories.map { category in
-            return [
-                "name": category.name,
-                "percentage": category.percentage,
-                "icon": category.icon,
-                "color": category.color
-            ] as [String: Any]
-        }
-
-        let body: [String: Any] = [
-            "annual_salary": income.annualSalary,
-            "contribution_401k": income.contribution401k,
-            "monthly_take_home": income.monthlyTakeHome,
-            "categories": categories
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpMethod = "DELETE"
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            httpResponse.statusCode == 200
+        else {
             throw BackendError.invalidResponse
         }
     }
 
-    func fetchBudget() async throws -> (UserIncome, BudgetAllocation)? {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
+    func unlinkTransactionAlert(_ alertId: String) async throws {
+        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)/unlink")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    // MARK: - Budget Categories
+
+    func fetchBudgetCategories() async throws -> [BudgetCategory] {
+        let url = URL(string: "\(baseURL)/budget-categories")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
         }
 
-        let url = URL(string: "\(baseURL)/users/\(userId)/budget")!
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let categoriesArray = json["categories"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        var categories: [BudgetCategory] = []
+
+        for dict in categoriesArray {
+            if let id = dict["id"] as? String,
+                let name = dict["name"] as? String,
+                let percentage = dict["percentage"] as? Double,
+                let icon = dict["icon"] as? String,
+                let isActive = dict["is_active"] as? Bool
+            {
+
+                let category = BudgetCategory(
+                    id: id,
+                    name: name,
+                    percentage: percentage,
+                    icon: icon,
+                    isActive: isActive
+                )
+                categories.append(category)
+            }
+        }
+
+        return categories
+    }
+
+    func createBudgetCategory(_ category: BudgetCategory) async throws -> String {
+        let url = URL(string: "\(baseURL)/budget-categories")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "name": category.name,
+            "percentage": category.percentage,
+            "icon": category.icon,
+            "is_active": category.isActive,
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
+
+    func updateBudgetCategory(categoryId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/budget-categories/\(categoryId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    func deleteBudgetCategory(_ categoryId: String) async throws {
+        let url = URL(string: "\(baseURL)/budget-categories/\(categoryId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    // MARK: - Budget Plans
+
+    func fetchActiveBudgetPlan() async throws -> BudgetPlan? {
+        let url = URL(string: "\(baseURL)/budget-plans/active")!
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendError.invalidResponse
         }
 
-        // If no budget exists, return nil
         if httpResponse.statusCode == 404 {
             return nil
         }
@@ -347,135 +389,194 @@ class BackendService: ObservableObject {
             throw BackendError.invalidResponse
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let annualSalary = json["annual_salary"] as? Double,
-              let contribution401k = json["contribution_401k"] as? Double,
-              let categoriesArray = json["categories"] as? [[String: Any]] else {
+        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = dict["id"] as? String,
+            let year = dict["year"] as? Int,
+            let annualSalaryGross = dict["annual_salary_gross"] as? Double,
+            let userIncomeId = dict["user_income_id"] as? String,
+            let categoryIds = dict["category_ids"] as? [String]
+        else {
             throw BackendError.invalidData
         }
 
-        // Recreate UserIncome using TaxService
-        let income = TaxService.shared.calculateAllTaxes(
-            annualSalary: annualSalary,
-            contribution401k: contribution401k
+        return BudgetPlan(
+            id: id,
+            year: year,
+            annualSalaryGross: annualSalaryGross,
+            userIncomeId: userIncomeId,
+            categoryIds: categoryIds
         )
-
-        // Recreate BudgetAllocation
-        var categories: [BudgetCategory] = []
-        for categoryDict in categoriesArray {
-            if let name = categoryDict["name"] as? String,
-               let percentage = categoryDict["percentage"] as? Double,
-               let icon = categoryDict["icon"] as? String,
-               let color = categoryDict["color"] as? String {
-
-                let category = BudgetCategory(
-                    name: name,
-                    percentage: percentage,
-                    icon: icon,
-                    color: color
-                )
-                categories.append(category)
-            }
-        }
-
-        let allocation = BudgetAllocation(categories: categories)
-
-        return (income, allocation)
     }
 
-    func deleteBudget() async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/budget")!
+    func createBudgetPlan(_ plan: BudgetPlan) async throws -> String {
+        let url = URL(string: "\(baseURL)/budget-plans")!
         var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    func updateBudgetCategories(_ categories: [BudgetCategory]) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/budget/categories")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let categoriesArray = categories.map { category in
-            return [
-                "name": category.name,
-                "percentage": category.percentage,
-                "icon": category.icon,
-                "color": category.color
-            ] as [String: Any]
-        }
-
-        let body: [String: Any] = ["categories": categoriesArray]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    func updateBudgetIncome(_ income: UserIncome) async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
-        }
-
-        let url = URL(string: "\(baseURL)/users/\(userId)/budget/income")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
+        request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
-            "annual_salary": income.annualSalary,
-            "contribution_401k": income.contribution401k
+            "year": plan.year,
+            "annual_salary_gross": plan.annualSalaryGross,
+            "user_income_id": plan.userIncomeId,
+            "category_ids": plan.categoryIds,
         ]
+
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            (200...299).contains(httpResponse.statusCode)
+        else {
             throw BackendError.invalidResponse
         }
+
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
     }
 
-    // MARK: - Snapshot Sync
+    // MARK: - User Income
 
-    func syncSnapshots() async throws {
-        guard let userId = currentUserId else {
-            throw BackendError.notRegistered
+    func fetchUserIncome(incomeId: String) async throws -> UserIncome? {
+        let url = URL(string: "\(baseURL)/user-incomes/\(incomeId)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.invalidResponse
         }
 
-        let snapshotService = SnapshotService.shared
-
-        // Upload monthly snapshots
-        for snapshot in snapshotService.monthlySnapshots {
-            try await uploadSnapshot(userId: userId, snapshot: snapshot, isYearly: false)
+        if httpResponse.statusCode == 404 {
+            return nil
         }
 
-        // Upload yearly snapshots
-        for snapshot in snapshotService.yearlySnapshots {
-            try await uploadSnapshot(userId: userId, snapshot: snapshot, isYearly: true)
+        guard httpResponse.statusCode == 200 else {
+            throw BackendError.invalidResponse
         }
+
+        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = dict["id"] as? String,
+            let year = dict["year"] as? Int,
+            let annualSalary = dict["annual_salary"] as? Double,
+            let contribution401k = dict["contribution_401k"] as? Double,
+            let federalTax = dict["federal_tax"] as? Double,
+            let socialSecurityTax = dict["social_security_tax"] as? Double,
+            let medicareTax = dict["medicare_tax"] as? Double,
+            let nyStateTax = dict["ny_state_tax"] as? Double,
+            let nycTax = dict["nyc_tax"] as? Double
+        else {
+            throw BackendError.invalidData
+        }
+
+        return UserIncome(
+            id: id,
+            year: year,
+            annualSalary: annualSalary,
+            contribution401k: contribution401k,
+            federalTax: federalTax,
+            socialSecurityTax: socialSecurityTax,
+            medicareTax: medicareTax,
+            nyStateTax: nyStateTax,
+            nycTax: nycTax
+        )
     }
 
-    private func uploadSnapshot(userId: String, snapshot: PeriodSnapshot, isYearly: Bool) async throws {
-        let url = URL(string: "\(baseURL)/users/\(userId)/snapshots")!
+    func createUserIncome(_ income: UserIncome) async throws -> String {
+        let url = URL(string: "\(baseURL)/user-incomes")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "year": income.year,
+            "annual_salary": income.annualSalary,
+            "contribution_401k": income.contribution401k,
+            "federal_tax": income.federalTax,
+            "social_security_tax": income.socialSecurityTax,
+            "medicare_tax": income.medicareTax,
+            "ny_state_tax": income.nyStateTax,
+            "nyc_tax": income.nycTax,
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
+
+    // MARK: - Snapshots
+
+    func fetchSnapshots(periodType: String = "monthly") async throws -> [PeriodSnapshot] {
+        let url = URL(string: "\(baseURL)/snapshots?type=\(periodType)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let snapshotsArray = json["snapshots"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        var snapshots: [PeriodSnapshot] = []
+
+        for dict in snapshotsArray {
+            if let idString = dict["id"] as? String,
+                let id = UUID(uuidString: idString),
+                let year = dict["year"] as? Int,
+                let monthlyTakeHome = dict["monthly_take_home"] as? Double,
+                let totalSpending = dict["total_spending"] as? Double,
+                let savings = dict["savings"] as? Double,
+                let transactionCount = dict["transaction_count"] as? Int,
+                let createdAtString = dict["created_at"] as? String,
+                let createdAt = dateFormatter.date(from: createdAtString)
+            {
+
+                let month = dict["month"] as? Int
+
+                let snapshot = PeriodSnapshot(
+                    id: id,
+                    year: year,
+                    month: month,
+                    monthlyTakeHome: monthlyTakeHome,
+                    totalSpending: totalSpending,
+                    savings: savings,
+                    createdAt: createdAt,
+                    transactionCount: transactionCount
+                )
+                snapshots.append(snapshot)
+            }
+        }
+
+        return snapshots
+    }
+
+    func createSnapshot(_ snapshot: PeriodSnapshot) async throws -> String {
+        let url = URL(string: "\(baseURL)/snapshots")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -487,7 +588,7 @@ class BackendService: ObservableObject {
             "total_spending": snapshot.totalSpending,
             "savings": snapshot.savings,
             "transaction_count": snapshot.transactionCount,
-            "created_at": dateFormatter.string(from: snapshot.createdAt)
+            "created_at": dateFormatter.string(from: snapshot.createdAt),
         ]
 
         if let month = snapshot.month {
@@ -496,49 +597,40 @@ class BackendService: ObservableObject {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+            (200...299).contains(httpResponse.statusCode)
+        else {
             throw BackendError.invalidResponse
         }
-    }
 
-    // MARK: - Persistence
-
-    private func saveUserId(_ userId: String) {
-        UserDefaults.standard.set(userId, forKey: "backend_user_id")
-    }
-
-    private func loadUserId() {
-        if let userId = UserDefaults.standard.string(forKey: "backend_user_id") {
-            self.currentUserId = userId
-            self.isRegistered = true
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
         }
-    }
 
-    func clearUserData() {
-        UserDefaults.standard.removeObject(forKey: "backend_user_id")
-        self.currentUserId = nil
-        self.isRegistered = false
+        return id
     }
 }
 
 // MARK: - Errors
 
-enum BackendError: LocalizedError {
-    case notRegistered
+public enum BackendError: LocalizedError {
     case invalidResponse
     case invalidData
+    case notConnected
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
-        case .notRegistered:
-            return "User is not registered with the backend server"
         case .invalidResponse:
             return "Invalid response from backend server"
         case .invalidData:
             return "Invalid data received from backend server"
+        case .notConnected:
+            return "Not connected to backend server"
         }
     }
 }

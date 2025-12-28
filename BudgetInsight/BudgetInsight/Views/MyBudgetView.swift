@@ -3,6 +3,7 @@ import SwiftUI
 struct MyBudgetView: View {
     @EnvironmentObject var viewModel: BudgetViewModel
     @State private var showAddCategory = false
+    @State private var showClearDataAlert = false
 
     var body: some View {
         Form {
@@ -74,49 +75,46 @@ struct MyBudgetView: View {
 
             // MARK: - Budget Allocation
             if let income = viewModel.userIncome {
-                Section(header:
-                    HStack {
-                        Text("Budget Allocation")
-                        Spacer()
-                        if let allocation = viewModel.budgetAllocation {
-                            Text("\(Int(allocation.totalPercentage))% allocated")
+                Section(
+                    header:
+                        HStack {
+                            Text("Budget Allocation")
+                            Spacer()
+                            Text("\(Int(viewModel.totalPercentageAllocated))% allocated")
                                 .foregroundColor(viewModel.isAllocationValid ? .secondary : .red)
                         }
-                    }
                 ) {
-                    if let allocation = viewModel.budgetAllocation {
-                        ForEach(allocation.categories) { category in
-                            CategoryAllocationRow(
-                                category: category,
-                                monthlyTakeHome: income.monthlyTakeHome,
-                                onUpdate: { newPercentage in
-                                    viewModel.updateCategoryPercentage(
-                                        categoryId: category.id,
-                                        percentage: newPercentage
-                                    )
-                                }
-                            )
-                        }
-                        .onDelete { indexSet in
-                            for index in indexSet {
-                                let category = allocation.categories[index]
-                                viewModel.deleteCategory(categoryId: category.id)
+                    ForEach(viewModel.budgetCategories.filter { $0.isActive }) { category in
+                        CategoryAllocationRow(
+                            category: category,
+                            monthlyTakeHome: income.monthlyTakeHome,
+                            onUpdate: { newPercentage in
+                                viewModel.updateCategoryPercentage(
+                                    categoryId: category.id,
+                                    percentage: newPercentage
+                                )
                             }
+                        )
+                    }
+                    .onDelete { indexSet in
+                        let activeCategories = viewModel.budgetCategories.filter { $0.isActive }
+                        for index in indexSet {
+                            let category = activeCategories[index]
+                            viewModel.deleteCategory(categoryId: category.id)
                         }
+                    }
 
-                        // Emergency Buffer
+                    // Remaining percentage display
+                    let remainingPercentage = 100.0 - viewModel.totalPercentageAllocated
+                    if remainingPercentage > 0 {
                         HStack {
-                            Text("Emergency Buffer")
+                            Text("Unallocated")
                                 .foregroundColor(.orange)
                                 .fontWeight(.medium)
                             Spacer()
-                            Text("\(String(format: "%.1f", allocation.emergencyBufferPercentage()))%")
-                            Text("($\(Int(income.monthlyTakeHome * allocation.emergencyBufferPercentage() / 100)))")
+                            Text("\(String(format: "%.1f", remainingPercentage))%")
+                            Text("($\(Int(income.monthlyTakeHome * remainingPercentage / 100)))")
                                 .foregroundColor(.secondary)
-                        }
-                    } else {
-                        Button("Create Default Budget") {
-                            viewModel.createDefaultCategories()
                         }
                     }
 
@@ -134,10 +132,33 @@ struct MyBudgetView: View {
                     }
                 }
             }
+
+            // MARK: - Debug/Reset Section
+            Section(header: Text("Reset")) {
+                Button(
+                    role: .destructive,
+                    action: {
+                        showClearDataAlert = true
+                    }
+                ) {
+                    Label("Clear All Budget Data", systemImage: "trash")
+                        .foregroundColor(.red)
+                }
+            }
         }
         .navigationTitle("My Budget")
         .sheet(isPresented: $showAddCategory) {
             AddCategorySheet(viewModel: viewModel)
+        }
+        .alert("Clear All Data?", isPresented: $showClearDataAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                viewModel.clearAllData()
+            }
+        } message: {
+            Text(
+                "This will remove all budget categories, income data, and budget plans. This action cannot be undone."
+            )
         }
     }
 }
@@ -219,7 +240,7 @@ struct AddCategorySheet: View {
     let iconOptions = [
         "dollarsign.circle", "cart.fill", "house.fill", "car.fill",
         "fork.knife", "tv.fill", "airplane", "heart.fill",
-        "phone.fill", "book.fill", "gamecontroller.fill", "cross.case.fill"
+        "phone.fill", "book.fill", "gamecontroller.fill", "cross.case.fill",
     ]
 
     var body: some View {
@@ -236,9 +257,11 @@ struct AddCategorySheet: View {
                 }
 
                 Section(header: Text("Icon")) {
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 50))
-                    ], spacing: 16) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 50))
+                        ], spacing: 16
+                    ) {
                         ForEach(iconOptions, id: \.self) { icon in
                             Button(action: {
                                 selectedIcon = icon
@@ -248,14 +271,14 @@ struct AddCategorySheet: View {
                                     .foregroundColor(selectedIcon == icon ? .blue : .gray)
                                     .frame(width: 50, height: 50)
                                     .background(
-                                        selectedIcon == icon ?
-                                            Color.blue.opacity(0.1) :
-                                            Color.clear
+                                        selectedIcon == icon ? Color.blue.opacity(0.1) : Color.clear
                                     )
                                     .cornerRadius(8)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.vertical, 8)
                 }
             }
             .navigationTitle("Add Category")
@@ -273,8 +296,7 @@ struct AddCategorySheet: View {
                             viewModel.addCategory(
                                 name: name,
                                 percentage: pct,
-                                icon: selectedIcon,
-                                color: selectedColor
+                                icon: selectedIcon
                             )
                             dismiss()
                         }

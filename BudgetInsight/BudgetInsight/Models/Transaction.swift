@@ -1,77 +1,35 @@
 import Foundation
 
+/// Represents a financial transaction (always manually entered)
 struct Transaction: Identifiable, Codable {
-    let id: String
-    let accountId: String
+    // ID - Firestore auto-generates, empty until saved to backend
+    var id: String
+
+    // Required fields
     let amount: Double
     let date: Date
-    let merchantName: String?
-    let category: [String]
-    let pending: Bool
+    let title: String
+    let categoryId: String  // BudgetCategory ID (Firestore auto-generated)
+    let isExpense: Bool  // True if expense, False if income
 
-    // Manual entry fields
+    // Automatic
+    let timestamp: Date  // Auto-set to now() when creating transaction
+
+    // Optional
     let linkedEmailAlertId: String?  // Links to TransactionAlert when matched
-    let isManualEntry: Bool  // True if manually entered, false if from external API
 
-    var primaryCategory: String {
-        category.first ?? "Other"
-    }
-
-    var isExpense: Bool {
-        amount > 0
-    }
-}
-
-enum TransactionCategory: String, CaseIterable, Codable {
-    case food = "Food & Dining"
-    case shopping = "Shopping"
-    case transportation = "Transportation"
-    case entertainment = "Entertainment"
-    case utilities = "Utilities"
-    case healthcare = "Healthcare"
-    case travel = "Travel"
-    case personal = "Personal"
-    case income = "Income"
-    case other = "Other"
-
-    var icon: String {
-        switch self {
-        case .food: return "fork.knife"
-        case .shopping: return "bag.fill"
-        case .transportation: return "car.fill"
-        case .entertainment: return "tv.fill"
-        case .utilities: return "house.fill"
-        case .healthcare: return "cross.case.fill"
-        case .travel: return "airplane"
-        case .personal: return "person.fill"
-        case .income: return "dollarsign.circle.fill"
-        case .other: return "ellipsis.circle.fill"
-        }
-    }
-
-    static func categorize(_ plaidCategories: [String]) -> TransactionCategory {
-        guard let primary = plaidCategories.first?.lowercased() else {
-            return .other
-        }
-
-        if primary.contains("food") || primary.contains("restaurant") {
-            return .food
-        } else if primary.contains("shop") || primary.contains("retail") {
-            return .shopping
-        } else if primary.contains("transport") || primary.contains("gas") {
-            return .transportation
-        } else if primary.contains("entertainment") || primary.contains("recreation") {
-            return .entertainment
-        } else if primary.contains("utilities") || primary.contains("telecom") {
-            return .utilities
-        } else if primary.contains("healthcare") || primary.contains("medical") {
-            return .healthcare
-        } else if primary.contains("travel") {
-            return .travel
-        } else if primary.contains("income") || primary.contains("payment") {
-            return .income
-        } else {
-            return .other
-        }
+    init(
+        id: String = "", amount: Double, date: Date, title: String,
+        categoryId: String, isExpense: Bool, timestamp: Date = Date(),
+        linkedEmailAlertId: String? = nil
+    ) {
+        self.id = id
+        self.amount = amount
+        self.date = date
+        self.title = title
+        self.categoryId = categoryId
+        self.isExpense = isExpense
+        self.timestamp = timestamp
+        self.linkedEmailAlertId = linkedEmailAlertId
     }
 }

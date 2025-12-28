@@ -1,35 +1,49 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is Rachel
+    // Helper function - check if user is Rachel
     function isRachel() {
       return request.auth != null && request.auth.token.email == 'rachel.j.chen@gmail.com';
     }
 
-    // Users collection - only Rachel can access
-    match /users/{userId} {
+    // App Settings - read/write for Rachel
+    match /app_settings/{document=**} {
       allow read, write: if isRachel();
-
-      // User's subcollections (budget data)
-      match /data/{document=**} {
-        allow read, write: if isRachel();
-      }
     }
 
-    // Transactions - only Rachel can access
+    // Budget Categories - read/write for Rachel
+    match /budget_categories/{categoryId} {
+      allow read, write: if isRachel();
+    }
+
+    // Transactions - read/write for Rachel
     match /transactions/{transactionId} {
       allow read, write: if isRachel();
     }
 
-    // Transaction alerts - only Rachel can access
+    // Transaction Alerts - read/write for Rachel
     match /transaction_alerts/{alertId} {
       allow read, write: if isRachel();
     }
 
-    // Snapshots (if used) - only Rachel can access
+    // Budget - read/write for Rachel
+    match /budget/{document=**} {
+      allow read, write: if isRachel();
+    }
+
+    // Snapshots - read/write for Rachel
     match /snapshots/{snapshotId} {
       allow read, write: if isRachel();
+    }
+
+    // Service account has full access (for backend operations)
+    // Service accounts don't go through these rules
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

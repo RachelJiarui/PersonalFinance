@@ -21,16 +21,21 @@ struct DashboardView: View {
                     }
 
                     // Always show content, never show loading spinner
-                    if let allocation = BudgetService.shared.budgetAllocation,
-                       let income = BudgetService.shared.userIncome {
-                        BudgetRingsSection(allocation: allocation, income: income)
+                    if let income = BudgetService.shared.userIncome,
+                        !BudgetService.shared.getActiveCategories().isEmpty
+                    {
+                        BudgetRingsSection(
+                            categories: BudgetService.shared.getActiveCategories(),
+                            categorySpending: viewModel.categorySpending,
+                            income: income
+                        )
                     } else {
                         // Prompt to set up budget
                         EmptyBudgetView()
                     }
                 }
                 .padding()
-                .padding(.bottom, 80) // Space for FAB
+                .padding(.bottom, 80)  // Space for FAB
             }
 
             // MARK: - Floating Action Button
@@ -70,13 +75,18 @@ struct DashboardView: View {
                             await viewModel.fetchOneEmailAlert()
                         }
                     }) {
-                        Label("Fetch Email Alert (Test)", systemImage: "envelope.arrow.triangle.branch")
+                        Label(
+                            "Fetch Email Alert (Test)",
+                            systemImage: "envelope.arrow.triangle.branch")
                     }
 
-                    Button(role: .destructive, action: {
-                        dashboardTask?.cancel()
-                        viewModel.disconnect()
-                    }) {
+                    Button(
+                        role: .destructive,
+                        action: {
+                            dashboardTask?.cancel()
+                            viewModel.disconnect()
+                        }
+                    ) {
                         Label("Disconnect", systemImage: "xmark.circle")
                     }
                 } label: {
@@ -169,7 +179,8 @@ struct HeaderView: View {
 }
 
 struct BudgetRingsSection: View {
-    let allocation: BudgetAllocation
+    let categories: [BudgetCategory]
+    let categorySpending: [String: Double]
     let income: UserIncome
 
     var body: some View {
@@ -178,13 +189,16 @@ struct BudgetRingsSection: View {
                 .font(.title2)
                 .fontWeight(.bold)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 20) {
-                ForEach(allocation.categories) { category in
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                ], spacing: 20
+            ) {
+                ForEach(categories) { category in
                     DashboardCategoryCard(
                         category: category,
+                        currentSpent: categorySpending[category.id] ?? 0.0,
                         monthlyTakeHome: income.monthlyTakeHome
                     )
                 }

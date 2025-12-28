@@ -1,9 +1,14 @@
 import Foundation
 
+/// Represents user income and tax calculations for a specific year
+/// Used by BudgetPlan to calculate monthly take-home for budget allocation
 struct UserIncome: Identifiable, Codable, Equatable {
-    let id: UUID
-    var annualSalary: Double
-    var contribution401k: Double  // Pre-tax amount
+    // ID - Firestore auto-generates, empty until saved to backend
+    var id: String
+
+    let year: Int  // Year this income applies to
+    var annualSalary: Double  // Gross annual salary
+    var contribution401k: Double  // Pre-tax 401k contribution
 
     // Tax amounts (calculated by TaxService)
     var federalTax: Double
@@ -28,8 +33,13 @@ struct UserIncome: Identifiable, Codable, Equatable {
         annualTakeHome / 12.0
     }
 
-    init(id: UUID = UUID(), annualSalary: Double, contribution401k: Double, federalTax: Double = 0, socialSecurityTax: Double = 0, medicareTax: Double = 0, nyStateTax: Double = 0, nycTax: Double = 0) {
+    init(
+        id: String = "", year: Int, annualSalary: Double, contribution401k: Double,
+        federalTax: Double = 0, socialSecurityTax: Double = 0, medicareTax: Double = 0,
+        nyStateTax: Double = 0, nycTax: Double = 0
+    ) {
         self.id = id
+        self.year = year
         self.annualSalary = annualSalary
         self.contribution401k = contribution401k
         self.federalTax = federalTax

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardCategoryCard: View {
     let category: BudgetCategory
+    let currentSpent: Double
     let monthlyTakeHome: Double
 
     private var budget: Double {
@@ -9,7 +10,7 @@ struct DashboardCategoryCard: View {
     }
 
     private var spendingRatio: Double {
-        category.spendingRatio(monthlyTakeHome: monthlyTakeHome)
+        category.spendingRatio(currentSpent: currentSpent, monthlyTakeHome: monthlyTakeHome)
     }
 
     // Calculate time ratio (how far through the month we are)
@@ -71,11 +72,11 @@ struct DashboardCategoryCard: View {
 
             // Budget details
             VStack(spacing: 4) {
-                Text("$\(Int(category.currentMonthSpent)) / $\(Int(budget))")
+                Text("$\(Int(currentSpent)) / $\(Int(budget))")
                     .font(.subheadline)
                     .fontWeight(.medium)
 
-                Text("$\(Int(max(0, budget - category.currentMonthSpent))) remaining")
+                Text("$\(Int(max(0, budget - currentSpent))) remaining")
                     .font(.caption)
                     .foregroundColor(ringColor)
             }

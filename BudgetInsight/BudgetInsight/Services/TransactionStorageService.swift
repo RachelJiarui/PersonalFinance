@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Handles local persistence of transactions and transaction alerts
 /// NOTE: Currently uses UserDefaults for local storage. Prepared for future backend API integration (EC2).
@@ -94,10 +94,22 @@ class TransactionStorageService: ObservableObject {
         // syncAlertsFromRemote()
     }
 
-    /// Mark an alert as linked and remove it from the needs entry queue
+    /// Mark an alert as linked by creating a new version with linkedTransactionId
     func linkAlert(id: String, toTransactionId transactionId: String) {
         if let index = transactionAlerts.firstIndex(where: { $0.id == id }) {
-            transactionAlerts[index].isLinked = true
+            let oldAlert = transactionAlerts[index]
+            // Create new alert with linkedTransactionId (TransactionAlert is immutable)
+            let updatedAlert = TransactionAlert(
+                id: oldAlert.id,
+                emailId: oldAlert.emailId,
+                merchant: oldAlert.merchant,
+                date: oldAlert.date,
+                amount: oldAlert.amount,
+                rawEmailBody: oldAlert.rawEmailBody,
+                receivedAt: oldAlert.receivedAt,
+                linkedTransactionId: transactionId
+            )
+            transactionAlerts[index] = updatedAlert
             persistTransactionAlerts()
 
             // TODO: Future - update backend API
@@ -107,7 +119,7 @@ class TransactionStorageService: ObservableObject {
 
     /// Get unlinked alerts (needs entry queue)
     func getUnlinkedAlerts() -> [TransactionAlert] {
-        return transactionAlerts.filter { !$0.isLinked }
+        return transactionAlerts.filter { !$0.isResolved }
     }
 
     /// Delete a transaction alert by ID

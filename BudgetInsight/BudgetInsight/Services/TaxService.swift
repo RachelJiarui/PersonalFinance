@@ -15,7 +15,7 @@ class TaxService {
         (103_350, 0.24),
         (197_300, 0.32),
         (250_525, 0.35),
-        (626_350, 0.37)
+        (626_350, 0.37),
     ]
 
     private let standardDeduction2025: Double = 15_000
@@ -30,7 +30,7 @@ class TaxService {
         (215_400, 0.0685),
         (1_077_550, 0.0965),
         (5_000_000, 0.103),
-        (25_000_000, 0.109)
+        (25_000_000, 0.109),
     ]
 
     // NYC Tax Brackets 2025 (Single Filer)
@@ -38,7 +38,7 @@ class TaxService {
         (0, 0.03078),
         (12_000, 0.03762),
         (25_000, 0.03819),
-        (50_000, 0.03876)
+        (50_000, 0.03876),
     ]
 
     // Flat rates
@@ -72,13 +72,15 @@ class TaxService {
 
     // MARK: - Progressive Tax Algorithm
 
-    private func calculateProgressiveTax(income: Double, brackets: [(threshold: Double, rate: Double)]) -> Double {
+    private func calculateProgressiveTax(
+        income: Double, brackets: [(threshold: Double, rate: Double)]
+    ) -> Double {
         var tax: Double = 0
-        var previousThreshold: Double = 0
 
         for (index, bracket) in brackets.enumerated() {
             // Determine the upper bound for this bracket
-            let nextThreshold = index < brackets.count - 1 ? brackets[index + 1].threshold : Double.infinity
+            let nextThreshold =
+                index < brackets.count - 1 ? brackets[index + 1].threshold : Double.infinity
 
             if income <= bracket.threshold {
                 // Income doesn't reach this bracket
@@ -99,7 +101,9 @@ class TaxService {
 
     // MARK: - Main Tax Calculation
 
-    func calculateAllTaxes(annualSalary: Double, contribution401k: Double) -> UserIncome {
+    func calculateAllTaxes(annualSalary: Double, contribution401k: Double, year: Int? = nil)
+        -> UserIncome
+    {
         let taxableIncome = annualSalary - contribution401k
 
         let federal = calculateFederalTax(taxableIncome: taxableIncome)
@@ -108,7 +112,12 @@ class TaxService {
         let nyState = calculateNYStateTax(taxableIncome: taxableIncome)
         let nyc = calculateNYCTax(taxableIncome: taxableIncome)
 
+        // Use provided year or current year
+        let currentYear = year ?? Calendar.current.component(.year, from: Date())
+
         return UserIncome(
+            id: UUID().uuidString,
+            year: currentYear,
             annualSalary: annualSalary,
             contribution401k: contribution401k,
             federalTax: federal,

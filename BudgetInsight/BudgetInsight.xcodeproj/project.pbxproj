@@ -12,12 +12,10 @@
 		1A000032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A000006 /* Assets.xcassets */; };
 		1A000033 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000008 /* DashboardView.swift */; };
 		1A000035 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C /* Transaction.swift */; };
-		1A000036 /* Budget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000E /* Budget.swift */; };
 		1A000037 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000010 /* DashboardViewModel.swift */; };
 		1A000038 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000012 /* KeychainService.swift */; };
 		1A000039 /* BudgetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000014 /* BudgetService.swift */; };
 		1A00003A /* CategoryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000016 /* CategoryCard.swift */; };
-		1A00003B /* SpendingInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000018 /* SpendingInsights.swift */; };
 		1A00003C /* TransactionAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000042 /* TransactionAlert.swift */; };
 		1A00003E /* TransactionStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000044 /* TransactionStorageService.swift */; };
 		1A00003F /* EmailSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000045 /* EmailSetupView.swift */; };
@@ -26,8 +24,8 @@
 		1A00004A /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000043 /* EmailService.swift */; };
 		CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192182EFF46B90053873B /* PeriodSnapshot.swift */; };
 		CCF1921B2EFF46B90053873B /* UserIncome.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192192EFF46B90053873B /* UserIncome.swift */; };
-		CCF1921C2EFF46B90053873B /* BudgetAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192162EFF46B90053873B /* BudgetAllocation.swift */; };
 		CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
+		CCF1921E2EFFNEW1 /* BudgetPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192372EFFNEW1 /* BudgetPlan.swift */; };
 		CCF192262EFF46E10053873B /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF1921E2EFF46E10053873B /* CalendarView.swift */; };
 		CCF192272EFF46E10053873B /* MyBudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192252EFF46E10053873B /* MyBudgetView.swift */; };
 		CCF192282EFF46E10053873B /* CircularProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */; };
@@ -39,6 +37,7 @@
 		CCF192302EFF46F60053873B /* HistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF1922E2EFF46F60053873B /* HistoryViewModel.swift */; };
 		CCF192332EFF47050053873B /* SnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192312EFF47050053873B /* SnapshotService.swift */; };
 		CCF192342EFF47050053873B /* TaxService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192322EFF47050053873B /* TaxService.swift */; };
+		CCF192352EFF47060053873B /* BackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192362EFF47060053873B /* BackendService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,22 +47,20 @@
 		1A000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A000008 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		1A00000C /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
-		1A00000E /* Budget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Budget.swift; sourceTree = "<group>"; };
 		1A000010 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		1A000012 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		1A000014 /* BudgetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetService.swift; sourceTree = "<group>"; };
 		1A000016 /* CategoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryCard.swift; sourceTree = "<group>"; };
-		1A000018 /* SpendingInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingInsights.swift; sourceTree = "<group>"; };
 		1A000042 /* TransactionAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAlert.swift; sourceTree = "<group>"; };
 		1A000043 /* EmailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailService.swift; sourceTree = "<group>"; };
 		1A000044 /* TransactionStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStorageService.swift; sourceTree = "<group>"; };
 		1A000045 /* EmailSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSetupView.swift; sourceTree = "<group>"; };
 		1A000048 /* ManualEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualEntryView.swift; sourceTree = "<group>"; };
 		1A000049 /* NeedsEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsEntryView.swift; sourceTree = "<group>"; };
-		CCF192162EFF46B90053873B /* BudgetAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetAllocation.swift; sourceTree = "<group>"; };
 		CCF192172EFF46B90053873B /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
 		CCF192182EFF46B90053873B /* PeriodSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodSnapshot.swift; sourceTree = "<group>"; };
 		CCF192192EFF46B90053873B /* UserIncome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIncome.swift; sourceTree = "<group>"; };
+		CCF192372EFFNEW1 /* BudgetPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetPlan.swift; sourceTree = "<group>"; };
 		CCF1921E2EFF46E10053873B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularProgressRing.swift; sourceTree = "<group>"; };
 		CCF192202EFF46E10053873B /* DashboardCategoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCategoryCard.swift; sourceTree = "<group>"; };
@@ -75,6 +72,7 @@
 		CCF1922E2EFF46F60053873B /* HistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewModel.swift; sourceTree = "<group>"; };
 		CCF192312EFF47050053873B /* SnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotService.swift; sourceTree = "<group>"; };
 		CCF192322EFF47050053873B /* TaxService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxService.swift; sourceTree = "<group>"; };
+		CCF192362EFF47060053873B /* BackendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,13 +111,11 @@
 			isa = PBXGroup;
 			children = (
 				1A00000C /* Transaction.swift */,
-				1A00000E /* Budget.swift */,
-				1A000018 /* SpendingInsights.swift */,
 				1A000042 /* TransactionAlert.swift */,
-				CCF192162EFF46B90053873B /* BudgetAllocation.swift */,
 				CCF192172EFF46B90053873B /* BudgetCategory.swift */,
 				CCF192182EFF46B90053873B /* PeriodSnapshot.swift */,
 				CCF192192EFF46B90053873B /* UserIncome.swift */,
+				CCF192372EFFNEW1 /* BudgetPlan.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -160,6 +156,7 @@
 				1A000014 /* BudgetService.swift */,
 				1A000043 /* EmailService.swift */,
 				1A000044 /* TransactionStorageService.swift */,
+				CCF192362EFF47060053873B /* BackendService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -262,9 +259,8 @@
 				CCF1921B2EFF46B90053873B /* UserIncome.swift in Sources */,
 				CCF192332EFF47050053873B /* SnapshotService.swift in Sources */,
 				CCF192342EFF47050053873B /* TaxService.swift in Sources */,
-				CCF1921C2EFF46B90053873B /* BudgetAllocation.swift in Sources */,
 				CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */,
-				1A000036 /* Budget.swift in Sources */,
+				CCF1921E2EFFNEW1 /* BudgetPlan.swift in Sources */,
 				1A000037 /* DashboardViewModel.swift in Sources */,
 				CCF1922F2EFF46F60053873B /* BudgetViewModel.swift in Sources */,
 				CCF192302EFF46F60053873B /* HistoryViewModel.swift in Sources */,
@@ -278,13 +274,13 @@
 				1A000038 /* KeychainService.swift in Sources */,
 				1A000039 /* BudgetService.swift in Sources */,
 				1A00003A /* CategoryCard.swift in Sources */,
-				1A00003B /* SpendingInsights.swift in Sources */,
 				1A00003C /* TransactionAlert.swift in Sources */,
 				1A00004A /* EmailService.swift in Sources */,
 				1A00003E /* TransactionStorageService.swift in Sources */,
 				1A00003F /* EmailSetupView.swift in Sources */,
 				1A000040 /* ManualEntryView.swift in Sources */,
 				1A000041 /* NeedsEntryView.swift in Sources */,
+				CCF192352EFF47060053873B /* BackendService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

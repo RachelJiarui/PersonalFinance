@@ -1,13 +1,18 @@
 import SwiftUI
 
+// DEPRECATED: This component is no longer used in favor of DashboardCategoryCard
+// Kept for backward compatibility but can be removed in the future
+
 struct CategoryCard: View {
-    let budget: Budget
+    let category: BudgetCategory
+    let currentSpent: Double
+    let monthlyBudget: Double
 
     var body: some View {
         VStack(spacing: 12) {
             HStack {
                 HStack(spacing: 12) {
-                    Image(systemName: budget.category.icon)
+                    Image(systemName: category.icon)
                         .font(.title3)
                         .foregroundColor(.blue)
                         .frame(width: 36, height: 36)
@@ -15,10 +20,10 @@ struct CategoryCard: View {
                         .cornerRadius(8)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(budget.category.rawValue)
+                        Text(category.name)
                             .font(.headline)
 
-                        Text("$\(Int(budget.currentMonthSpent)) of $\(Int(budget.monthlyLimit))")
+                        Text("$\(Int(currentSpent)) of $\(Int(monthlyBudget))")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -27,13 +32,17 @@ struct CategoryCard: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(Int(budget.monthlyPercentage))%")
+                    let percentage = monthlyBudget > 0 ? (currentSpent / monthlyBudget) * 100 : 0
+                    Text("\(Int(percentage))%")
                         .font(.headline)
                         .foregroundColor(statusColor)
 
-                    Text(budget.monthlyRemaining >= 0 ? "$\(Int(budget.monthlyRemaining)) left" : "$\(Int(abs(budget.monthlyRemaining))) over")
-                        .font(.caption)
-                        .foregroundColor(budget.monthlyRemaining >= 0 ? .secondary : .red)
+                    let remaining = monthlyBudget - currentSpent
+                    Text(
+                        remaining >= 0 ? "$\(Int(remaining)) left" : "$\(Int(abs(remaining))) over"
+                    )
+                    .font(.caption)
+                    .foregroundColor(remaining >= 0 ? .secondary : .red)
                 }
             }
 
@@ -43,28 +52,16 @@ struct CategoryCard: View {
                         .fill(Color.gray.opacity(0.2))
                         .frame(height: 8)
 
+                    let percentage = monthlyBudget > 0 ? (currentSpent / monthlyBudget) * 100 : 0
                     RoundedRectangle(cornerRadius: 4)
                         .fill(progressGradient)
-                        .frame(width: min(CGFloat(budget.monthlyPercentage / 100) * geometry.size.width, geometry.size.width), height: 8)
+                        .frame(
+                            width: min(
+                                CGFloat(percentage / 100) * geometry.size.width, geometry.size.width
+                            ), height: 8)
                 }
             }
             .frame(height: 8)
-
-            HStack(spacing: 16) {
-                StatusBadge(
-                    label: "Monthly",
-                    value: "$\(Int(budget.currentMonthSpent))",
-                    total: "$\(Int(budget.monthlyLimit))",
-                    color: statusColor
-                )
-
-                StatusBadge(
-                    label: "Yearly",
-                    value: "$\(Int(budget.currentYearSpent))",
-                    total: "$\(Int(budget.yearlyLimit))",
-                    color: yearlyStatusColor
-                )
-            }
         }
         .padding()
         .background(Color(.systemBackground))
@@ -73,17 +70,10 @@ struct CategoryCard: View {
     }
 
     private var statusColor: Color {
-        switch budget.status {
-        case .healthy: return .green
-        case .warning: return .orange
-        case .exceeded: return .red
-        }
-    }
-
-    private var yearlyStatusColor: Color {
-        if budget.currentYearSpent > budget.yearlyLimit {
+        let percentage = monthlyBudget > 0 ? (currentSpent / monthlyBudget) * 100 : 0
+        if percentage > 100 {
             return .red
-        } else if budget.yearlyPercentage >= 80 {
+        } else if percentage >= 80 {
             return .orange
         } else {
             return .green
@@ -96,39 +86,5 @@ struct CategoryCard: View {
             startPoint: .leading,
             endPoint: .trailing
         )
-    }
-}
-
-struct StatusBadge: View {
-    let label: String
-    let value: String
-    let total: String
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .textCase(.uppercase)
-
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6, height: 6)
-
-                Text(value)
-                    .font(.caption)
-                    .fontWeight(.medium)
-
-                Text("/ \(total)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(8)
     }
 }

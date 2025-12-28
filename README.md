@@ -1,312 +1,330 @@
 # Budget Insight
 
-A minimalistic iOS finance tracking app that automatically syncs with your bank accounts through SimpleFin to help you understand your spending habits and manage your budget.
+A minimalistic iOS finance tracking app that automatically captures transaction emails from your bank and helps you manage your budget with real-time notifications.
 
 ## Features
 
-- **Automatic Transaction Sync**: Connect once via SimpleFin and never manually enter expenses again
+- **Automatic Email Parsing**: Receive transaction alerts from Discover Bank via Gmail
+- **Real-Time Push Notifications**: Get notified instantly when transactions occur
 - **At-a-Glance Dashboard**: See your financial status instantly on the home screen
 - **Smart Budget Tracking**: Monitor monthly and yearly budgets by category
-- **Intelligent Insights**: Get personalized recommendations on spending patterns
+- **Cloud Sync**: Backend powered by Google Cloud (Cloud Run + Firestore)
+- **Auto-Sync on Startup**: Fetches transactions, alerts, and historical data from backend
 - **Minimalistic Design**: Clean, Apple-inspired interface
-- **Secure Storage**: Bank credentials safely stored using iOS Keychain
-- **No Login Required**: Connect once and stay authenticated
-- **Privacy First**: All data stays on your device
+- **Privacy First**: Your data, your control with Firestore security rules
 
-## What You Can See
+## How It Works
 
-### Dashboard Overview
-- **Monthly Cash Flow**: Net income vs expenses
-- **Savings Rate**: Percentage of income saved
-- **Month-over-Month Comparison**: Track spending trends
+### System Architecture
 
-### Budget Categories
-- Food & Dining
-- Shopping
-- Transportation
-- Entertainment
-- Utilities
-- Healthcare
-- Travel
-- Personal
+```
+Discover Bank → Gmail → Google Pub/Sub → Cloud Run Backend → iOS App
+                                              ↓
+                                          Firestore
+```
 
-Each category shows:
-- Current spending vs budget limit
-- Visual progress bar
-- Monthly and yearly tracking
-- Remaining budget
+1. **Transaction happens** at Discover Bank
+2. **Email alert sent** to your Gmail
+3. **Gmail push notification** triggers Google Pub/Sub
+4. **Cloud Run backend** parses the email and extracts transaction details
+5. **Push notification sent** to your iOS device
+6. **Transaction saved** to Firestore
+7. **iOS app syncs** and displays the transaction
 
-### Smart Insights
-- Budget warnings when approaching limits
-- Spending recommendations
-- Achievement notifications
-- Top spending category highlights
+## Tech Stack
 
-## Technical Stack
-
+### iOS App
 - **Language**: Swift 5.9
 - **UI Framework**: SwiftUI
 - **Minimum iOS**: 16.0
 - **Architecture**: MVVM
-- **Bank Integration**: SimpleFin Bridge API
-- **Security**: iOS Keychain for token storage
-- **Data Persistence**: UserDefaults & Codable
+- **Push Notifications**: Apple Push Notification Service (APNs)
+
+### Backend (Cloud Run)
+- **Framework**: Flask (Python)
+- **Database**: Google Cloud Firestore
+- **Email Integration**: Gmail API
+- **Push Notifications**: Google Cloud Pub/Sub
+- **Hosting**: Google Cloud Run (serverless)
+- **Authentication**: OAuth 2.0 + Service Accounts
+
+## Project Structure
+
+```
+finance/
+├── BudgetInsight/                    # iOS App
+│   ├── Models/
+│   │   ├── Transaction.swift
+│   │   ├── Budget.swift
+│   │   └── SpendingInsights.swift
+│   ├── Views/
+│   │   ├── DashboardView.swift
+│   │   └── CategoryCard.swift
+│   ├── ViewModels/
+│   │   └── DashboardViewModel.swift
+│   └── Services/
+│       ├── BackendService.swift      # API client
+│       └── KeychainService.swift
+│
+├── backend/                          # Cloud Run Backend
+│   ├── app.py                        # Flask server
+│   ├── services/
+│   │   ├── firestore_service.py      # Database operations
+│   │   ├── gmail_service.py          # Gmail API integration
+│   │   ├── transaction_parser.py     # Email parsing
+│   │   ├── apns_service.py          # Push notifications
+│   │   └── pubsub_service.py        # Pub/Sub handling
+│   ├── Dockerfile                    # Container config
+│   └── requirements.txt
+│
+├── firestore.rules                   # Database security rules
+└── firestore.indexes.json           # Database indexes
+```
+
+## Database Structure (Firestore)
+
+### Collections:
+1. **`users/{user_id}`** - User profile and metadata
+   - Email, device tokens, last Gmail history ID
+
+2. **`users/{user_id}/data/budget`** - Budget allocation
+   - Annual salary, 401k, monthly take-home, categories
+
+3. **`transactions/{transaction_id}`** - All spending transactions
+   - Amount, merchant, category, date, linked alert
+
+4. **`transaction_alerts/{alert_id}`** - Email alerts from Gmail
+   - Email ID, amount, merchant, linking status
+
+See [FIRESTORE_STRUCTURE.md](FIRESTORE_STRUCTURE.md) for complete schema.
 
 ## Setup Instructions
 
 ### Prerequisites
 
-1. **Xcode 15.0+** installed on your Mac
-2. **iOS 16.0+** device or simulator
-3. **SimpleFin Account** (for bank connections)
+1. **Google Cloud Project** with billing enabled
+2. **Xcode 15.0+** installed on your Mac
+3. **iOS 16.0+** device (physical device required for push notifications)
+4. **Apple Developer Account** (for APNs certificates)
+5. **Gmail account** to monitor for transaction emails
 
-### SimpleFin Configuration
+### Backend Setup (Cloud Run)
 
-1. Sign up for SimpleFin at [beta-bridge.simplefin.org](https://beta-bridge.simplefin.org/)
-2. Connect your bank accounts through SimpleFin Bridge
-3. Generate a **Setup Token** from the SimpleFin dashboard
-4. Copy the base64-encoded setup token
+1. **Install Google Cloud SDK**:
+   ```bash
+   brew install google-cloud-sdk
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
 
-**Important**: SimpleFin is much cheaper than alternatives:
-- **Cost**: $1.50/month (or $15/year)
-- **No per-transaction fees**
-- **No usage limits**
-- **Privacy-focused**: No data selling
+2. **Deploy Firestore Security Rules**:
+   ```bash
+   firebase deploy --only firestore:rules
+   firebase deploy --only firestore:indexes
+   ```
 
-### Installation
+3. **Deploy to Cloud Run**:
+   ```bash
+   cd backend
+   ./deploy.sh
+   ```
+   
+   Save the URL output (e.g., `https://budgetinsight-backend-xxx.run.app`)
 
-1. Clone or download this repository
-2. Open `BudgetInsight.xcodeproj` in Xcode
-3. Select your target device/simulator
-4. Build and run (⌘R)
+4. **Setup Gmail Push Notifications**:
+   ```bash
+   cd backend
+   python setup_gmail_push.py --email your.email@gmail.com
+   ```
 
-### First Run
+5. **Setup Auto-Renewal** (keeps Gmail watch active):
+   ```bash
+   ./setup_auto_renewal.sh
+   ```
 
-1. Launch the app
-2. Tap "Connect SimpleFin"
-3. Paste your setup token from SimpleFin
-4. Tap "Connect"
-5. Wait for initial sync to complete
+See [DEPLOYMENT_QUICK_REFERENCE.md](DEPLOYMENT_QUICK_REFERENCE.md) for detailed setup.
 
-### Your Setup Token
+### iOS App Setup
 
-You provided this setup token (already saved for reference):
+1. **Update Backend URL** - See [BACKEND_SETUP.md](BACKEND_SETUP.md) for detailed instructions.
+
+   **Quick Setup** - Add environment variable in Xcode:
+   - Go to `Product` → `Scheme` → `Edit Scheme...` → `Run` → `Arguments`
+   - Add environment variable:
+     - Name: `BACKEND_URL`
+     - Value: `https://your-cloud-run-url.run.app/api`
+
+   Or update `BudgetInsight/Services/BackendService.swift` directly.
+
+2. **Configure APNs** in Xcode:
+   - Enable Push Notifications capability
+   - Enable Background Modes → Remote notifications
+
+3. **Build and Run**:
+   - Open `BudgetInsight.xcodeproj`
+   - Select your physical iOS device
+   - Build and run (⌘R)
+
+## API Endpoints
+
+### User Management
+- `POST /api/users/register` - Register new user with device token
+- `PUT /api/users/{user_id}/device-token` - Update device token
+
+### Transactions
+- `GET /api/users/{user_id}/transactions` - Get all transactions
+- `POST /api/users/{user_id}/transactions` - Create transaction
+- `DELETE /api/transactions/{transaction_id}` - Delete transaction
+
+### Budget
+- `GET /api/users/{user_id}/budget` - Get budget data
+- `POST /api/users/{user_id}/budget` - Save/update budget
+
+### Transaction Alerts
+- `GET /api/users/{user_id}/alerts` - Get unlinked email alerts
+- `POST /api/alerts/{alert_id}/link` - Link alert to transaction
+
+### Webhooks
+- `POST /webhooks/gmail` - Gmail push notification receiver
+
+## Cost Breakdown (Monthly)
+
+### Google Cloud (for 100 users)
+- **Cloud Run**: $0-5 (2M requests free tier)
+- **Firestore**: $0 (1GB + 50K reads/day free tier)
+- **Pub/Sub**: ~$0.40 per 1M messages
+- **Cloud Scheduler**: $0.10/month (auto-renewal)
+
+**Total: $0.50 - $6/month** (well within free tier for personal use)
+
+### Development
+- **Apple Developer**: $99/year
+- **Domain (optional)**: ~$12/year
+
+## Supported Banks
+
+Currently supports:
+- **Discover Bank** transaction emails
+
+Email format expected:
 ```
-aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS8yQzUxMTcyQTA4MDczM0ExM0Q0RTBBRjRGQTkxNTFENjc2QkY3QUNGOTIzNzdCQjlEQTA5MDM3RThCRDFDNTg4OUJBMzEzOTdBRDQyQ0FGMjNCNzRDQkM3MDc5OUI5Qzk2RTRCQ0Q4QkE5QTYyMzI0NEFCNUZCMjE2RDlGQTE0Mg==
+Subject: Your Discover Purchase Alert
+From: discover@services.discover.com
+
+A purchase of $XX.XX was made at MERCHANT NAME on MM/DD/YYYY.
 ```
 
-**Note**: This token can only be claimed once. After you use it in the app, it converts to an access URL that's saved securely in your Keychain.
+### Adding More Banks
 
-## Project Structure
+To add support for other banks, update `backend/services/transaction_parser.py`:
 
-```
-BudgetInsight/
-├── BudgetInsight/
-│   ├── Models/
-│   │   ├── Transaction.swift          # Transaction data model
-│   │   ├── Budget.swift                # Budget tracking model
-│   │   └── SpendingInsights.swift     # Insights engine
-│   ├── Views/
-│   │   ├── ContentView.swift           # Main entry view
-│   │   ├── DashboardView.swift         # Main dashboard
-│   │   └── CategoryCard.swift          # Budget category card
-│   ├── ViewModels/
-│   │   └── DashboardViewModel.swift    # Dashboard logic
-│   ├── Services/
-│   │   ├── SimpleFinService.swift      # SimpleFin API integration
-│   │   ├── KeychainService.swift       # Secure storage
-│   │   └── BudgetService.swift         # Budget calculations
-│   └── BudgetInsightApp.swift          # App entry point
-└── Package.swift                        # Dependencies (none needed!)
+```python
+def parse_bank_email(message):
+    # Add parsing logic for your bank's email format
+    if 'chase' in sender:
+        return parse_chase_email(message)
+    elif 'amex' in sender:
+        return parse_amex_email(message)
 ```
 
 ## Security Features
 
-### Keychain Integration
-All sensitive data is stored securely:
-- SimpleFin access URL encrypted in iOS Keychain
-- URLs only accessible when device is unlocked
-- Automatic cleanup on app deletion
+### Firestore Security Rules
+- Only authenticated user (rachel.j.chen@gmail.com) can read/write
+- Service account has full access for backend operations
+- All other access denied
 
 ### Data Privacy
-- No user data stored on external servers
-- All calculations performed on-device
-- Bank credentials never stored in the app
-- SimpleFin handles authentication securely
-- Your data is NEVER sold or shared
+- No user data stored on external servers (besides Google Cloud)
+- All calculations performed server-side or on-device
+- Bank emails only store first 500 characters
+- OAuth tokens stored securely in Firestore
 
-## SimpleFin vs Plaid
+## Testing
 
-Why SimpleFin is better for personal finance apps:
-
-| Feature | SimpleFin | Plaid |
-|---------|-----------|-------|
-| **Cost** | $1.50/month | $5-50+/month |
-| **Pricing Model** | Flat rate | Per-connection |
-| **Privacy** | Privacy-focused | Data aggregation |
-| **Setup** | Simple token | Complex OAuth |
-| **Rate Limits** | 24/day | Varies |
-| **Best For** | Personal use | Businesses |
-
-## Customizing Budgets
-
-Default budgets are created on first launch:
-- Food & Dining: $600/month
-- Shopping: $400/month
-- Transportation: $300/month
-- Entertainment: $200/month
-- Utilities: $250/month
-
-To customize budgets, modify the `createDefaultBudgets()` method in `BudgetService.swift`:
-
-```swift
-func createDefaultBudgets() {
-    budgets = [
-        Budget(id: UUID(), category: .food, monthlyLimit: 800, yearlyLimit: 9600, ...),
-        // Customize amounts here
-    ]
-}
+### Test Firestore Connection
+```bash
+cd backend
+source venv/bin/activate
+python test_firestore_write.py
+python test_firestore_read.py
 ```
 
-## API Usage
-
-### SimpleFin Integration
-
-The app uses SimpleFin Bridge API endpoints:
-
-1. **POST /claim/{token}**
-   - Converts setup token to access URL
-   - Called once during initial connection
-
-2. **GET /accounts**
-   - Retrieves accounts and transactions
-   - Called on app launch and manual refresh
-   - Automatically categorizes transactions
-   - Limited to 24 requests per day
-
-### SimpleFin Response Format
-
-SimpleFin returns account data with transactions:
-```json
-{
-  "accounts": [
-    {
-      "id": "account_id",
-      "name": "Checking Account",
-      "balance": 125000,
-      "transactions": [
-        {
-          "id": "txn_id",
-          "posted": 1704067200,
-          "amount": -4500,
-          "description": "STARBUCKS",
-          "pending": false
-        }
-      ]
-    }
-  ]
-}
+### Test Backend Health
+```bash
+curl https://your-cloud-run-url.run.app/health
 ```
 
-Note: Amounts are in 1/10,000ths of the currency unit (e.g., 4500 = $0.45).
-
-## Known Limitations
-
-- **Rate Limit**: 24 API requests per day (SimpleFin restriction)
-- **Manual Refresh**: Pull to refresh for latest transactions
-- **Single SimpleFin Account**: One setup token per app instance
+### Test Push Notifications
+Forward an old Discover transaction email to your monitored Gmail account and check if:
+1. Backend parses it correctly (check Cloud Run logs)
+2. Push notification arrives on iOS device
+3. Transaction appears in app
 
 ## Troubleshooting
 
-### App Won't Connect to SimpleFin
-- Verify setup token is correct and hasn't been used
-- Check internet connection
-- Ensure SimpleFin account is active
+### Backend Issues
 
-### Transactions Not Syncing
-- Pull down to refresh manually
-- Check you haven't exceeded 24 requests/day
-- Verify SimpleFin Bridge is working at beta-bridge.simplefin.org
+**Check Cloud Run Logs**:
+```bash
+gcloud run services logs tail budgetinsight-backend --region=us-central1
+```
 
-### Budget Not Updating
-- Ensure transactions are synced
-- Check transaction categories match budget categories
-- Verify date range includes current month
+**Gmail Watch Expired**:
+```bash
+cd backend
+python setup_gmail_push.py --email your.email@gmail.com
+```
 
-### "Invalid Setup Token" Error
-- Setup tokens can only be claimed once
-- Generate a new token from SimpleFin dashboard
-- Ensure token is copied completely (base64 string)
+### iOS App Issues
 
-### Build Errors
-- Clean build folder (⌘⇧K)
-- Ensure Xcode 15.0+ is installed
-- Check iOS deployment target is 16.0+
+**Push Notifications Not Working**:
+- Ensure you're testing on a physical device (not simulator)
+- Verify APNs certificates are valid
+- Check device token is registered in Firestore
+
+**Transactions Not Syncing**:
+- Check backend URL is correct
+- Verify internet connection
+- Check Cloud Run logs for errors
+
+### Firestore Issues
+
+**Queries Failing**:
+- Ensure indexes are deployed: `firebase deploy --only firestore:indexes`
+- Check security rules: `firebase deploy --only firestore:rules`
 
 ## Future Enhancements
 
-Potential features for future versions:
-- Multiple SimpleFin account support
-- Custom budget categories
-- Spending goals and milestones
-- Export data to CSV
-- Recurring transaction detection
-- Bill reminders
-- Investment account tracking
-- Receipt scanning
-- Budget sharing (family accounts)
+- [ ] Multi-bank support (Chase, AmEx, etc.)
+- [ ] Custom budget categories
+- [ ] Spending goals and milestones
+- [ ] Export data to CSV
+- [ ] Bill reminders
+- [ ] Receipt scanning
+- [ ] Budget sharing (family accounts)
+- [ ] Advanced analytics and insights
+- [ ] Dark mode support
 
-## SimpleFin Resources
+## Resources
 
-- **Sign Up**: https://beta-bridge.simplefin.org/
-- **Documentation**: https://www.simplefin.org/protocol.html
-- **Developer Guide**: https://beta-bridge.simplefin.org/info/developers
-- **Cost**: $1.50/month or $15/year
+### Documentation
+- [Firestore Structure](FIRESTORE_STRUCTURE.md) - Database schema
+- [Architecture](backend/ARCHITECTURE.md) - System design
+- [Deployment Guide](CLOUD_RUN_DEPLOYMENT.md) - Full setup walkthrough
+- [Gmail Setup](GMAIL_PUSH_SETUP_GUIDE.md) - Gmail integration guide
 
-## Production Deployment
-
-Before deploying to App Store:
-
-1. **Complete Testing**:
-   - Test with real bank accounts via SimpleFin
-   - Verify all edge cases
-   - Test on multiple iOS versions
-
-2. **App Store Requirements**:
-   - Add Privacy Policy URL
-   - Complete App Store description
-   - Include screenshots of dashboard
-   - Mention SimpleFin integration in description
-
-3. **Code Signing**:
-   - Configure proper provisioning profiles
-   - Enable necessary capabilities in Xcode
-
-4. **Privacy**:
-   - Update Info.plist with privacy descriptions
-   - Explain data usage in App Store listing
+### Google Cloud
+- [Firestore Console](https://console.cloud.google.com/firestore)
+- [Cloud Run Console](https://console.cloud.google.com/run)
+- [Pub/Sub Console](https://console.cloud.google.com/cloudpubsub)
 
 ## License
 
 This project is provided as-is for personal use.
 
-## Support
-
-For SimpleFin-specific issues, refer to [SimpleFin Documentation](https://www.simplefin.org/protocol.html).
-
-For app-related questions, check the code comments and inline documentation.
-
 ## Acknowledgments
 
-- **SimpleFin** for providing affordable, privacy-focused banking infrastructure
-- **Apple** for SwiftUI framework
-- **Swift Community** for excellent tooling and resources
-
-## Why SimpleFin?
-
-SimpleFin is perfect for personal finance apps because:
-- ✅ **Affordable**: $1.50/month vs $50+/month with Plaid
-- ✅ **Privacy-focused**: Your data is never sold
-- ✅ **Simple**: Just paste a token, no complex OAuth
-- ✅ **Reliable**: Direct bank connections via their aggregation
-- ✅ **No surprises**: Flat rate pricing, no per-use fees
+- **Google Cloud** for serverless infrastructure
+- **Apple** for SwiftUI and APNs
+- **Discover Bank** for consistent email formatting
