@@ -29,11 +29,22 @@ class AllocationService: ObservableObject {
             )
 
             await MainActor.run {
-                self.allocations = firestoreAllocations
+                // Merge Firestore data with local data instead of replacing
+                // Keep local allocations that aren't in Firestore yet (empty IDs)
+                let localOnlyAllocations = self.allocations.filter { $0.id.isEmpty }
+
+                // Combine: Firestore allocations + local-only allocations
+                self.allocations = firestoreAllocations + localOnlyAllocations
                 self.saveAllocations()
+
+                print(
+                    "📊 [AllocationService] Total allocations after merge: \(self.allocations.count)"
+                )
             }
         } catch {
             print("❌ [AllocationService] Error fetching allocations from Firestore: \(error)")
+            print("⚠️ [AllocationService] Using local data only. Backend may not be deployed.")
+            // Don't clear local allocations on error - keep what we have
         }
     }
 
@@ -45,6 +56,14 @@ class AllocationService: ObservableObject {
         destinationId: String,
         amount: Double
     ) -> TransactionAllocation {
+        // Validate that the destination exists
+        let isValid = validateDestination(type: destinationType, id: destinationId)
+        if !isValid {
+            print("⚠️ [AllocationService] WARNING: Creating allocation with invalid destination!")
+            print("   Type: \(destinationType.rawValue), ID: \(destinationId)")
+            print("   Transaction ID: \(transactionId), Amount: $\(amount)")
+        }
+
         let newAllocation = TransactionAllocation(
             id: "",  // Firestore will generate this
             transactionId: transactionId,
@@ -202,6 +221,19 @@ class AllocationService: ObservableObject {
     func clearAllData() {
         allocations = []
         userDefaults.removeObject(forKey: allocationsKey)
+    }
+
+    // MARK: - Validation
+
+    private func validateDestination(type: AllocationType, id: String) -> Bool {
+        switch type {
+        case .category:
+            return BudgetService.shared.getCategoryById(id) != nil
+        case .fund:
+            return FundService.shared.funds.contains(where: { $0.id == id })
+        case .debt:
+            return DebtService.shared.debts.contains(where: { $0.id == id })
+        }
     }
 
     // MARK: - Persistence

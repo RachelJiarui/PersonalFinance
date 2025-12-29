@@ -27,8 +27,15 @@ class FundService: ObservableObject {
             print("✅ [FundService] Fetched \(firestoreFunds.count) funds from Firestore")
 
             await MainActor.run {
-                self.funds = firestoreFunds
+                // Merge Firestore data with local data instead of replacing
+                // Keep local funds that aren't in Firestore yet (empty IDs)
+                let localOnlyFunds = self.funds.filter { $0.id.isEmpty }
+
+                // Combine: Firestore funds + local-only funds
+                self.funds = firestoreFunds + localOnlyFunds
                 self.saveFunds()
+
+                print("📊 [FundService] Total funds after merge: \(self.funds.count)")
             }
         } catch {
             print("❌ [FundService] Error fetching funds from Firestore: \(error)")
