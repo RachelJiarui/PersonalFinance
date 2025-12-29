@@ -56,7 +56,7 @@ class TransactionStorageService: ObservableObject {
     }
 
     /// Persist transactions to UserDefaults
-    private func persistTransactions() {
+    func persistTransactions() {
         do {
             let data = try JSONEncoder().encode(transactions)
             UserDefaults.standard.set(data, forKey: transactionsKey)
@@ -139,7 +139,7 @@ class TransactionStorageService: ObservableObject {
     }
 
     /// Persist transaction alerts to UserDefaults
-    private func persistTransactionAlerts() {
+    func persistTransactionAlerts() {
         do {
             let data = try JSONEncoder().encode(transactionAlerts)
             UserDefaults.standard.set(data, forKey: alertsKey)

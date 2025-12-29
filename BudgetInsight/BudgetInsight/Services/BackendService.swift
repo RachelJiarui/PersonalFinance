@@ -25,7 +25,7 @@ class BackendService: ObservableObject {
 
     func checkHealth() async throws -> Bool {
         let url = URL(string: "\(baseURL.replacingOccurrences(of: "/api", with: ""))/health")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (_, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200

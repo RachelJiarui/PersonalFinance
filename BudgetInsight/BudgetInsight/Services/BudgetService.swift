@@ -459,7 +459,7 @@ class BudgetService: ObservableObject {
         }
     }
 
-    private func saveBudgetCategories() {
+    func saveBudgetCategories() {
         if let encoded = try? JSONEncoder().encode(budgetCategories) {
             userDefaults.set(encoded, forKey: categoriesKey)
         }

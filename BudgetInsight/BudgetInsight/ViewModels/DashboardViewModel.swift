@@ -118,14 +118,13 @@ class DashboardViewModel: ObservableObject {
             print("📥 [DashboardViewModel] Fetching transactions from backend...")
             let backendTransactions = try await backendService.fetchTransactions()
 
-            // Merge with local transactions (avoid duplicates by ID)
-            for transaction in backendTransactions {
-                if !storageService.transactions.contains(where: { $0.id == transaction.id }) {
-                    storageService.saveTransaction(transaction)
-                }
+            // Use Firestore as source of truth - replace local data entirely
+            await MainActor.run {
+                storageService.transactions = backendTransactions
+                storageService.persistTransactions()
             }
             print(
-                "✅ [DashboardViewModel] Fetched \(backendTransactions.count) transactions from backend"
+                "✅ [DashboardViewModel] Synced \(backendTransactions.count) transactions from backend (source of truth)"
             )
 
             try Task.checkCancellation()
@@ -134,14 +133,13 @@ class DashboardViewModel: ObservableObject {
             print("📥 [DashboardViewModel] Fetching unresolved alerts from backend...")
             let backendAlerts = try await backendService.fetchTransactionAlerts(resolved: false)
 
-            // Merge with local alerts
-            for alert in backendAlerts {
-                if !storageService.transactionAlerts.contains(where: { $0.id == alert.id }) {
-                    storageService.saveTransactionAlert(alert)
-                }
+            // Use Firestore as source of truth - replace local data entirely
+            await MainActor.run {
+                storageService.transactionAlerts = backendAlerts
+                storageService.persistTransactionAlerts()
             }
             print(
-                "✅ [DashboardViewModel] Fetched \(backendAlerts.count) unresolved alerts from backend"
+                "✅ [DashboardViewModel] Synced \(backendAlerts.count) unresolved alerts from backend (source of truth)"
             )
 
             try Task.checkCancellation()
@@ -151,15 +149,14 @@ class DashboardViewModel: ObservableObject {
             let monthlySnapshots = try await backendService.fetchSnapshots(periodType: "monthly")
             let yearlySnapshots = try await backendService.fetchSnapshots(periodType: "yearly")
 
-            // Update snapshot service with backend data
-            for snapshot in monthlySnapshots {
-                snapshotService.addSnapshot(snapshot)
-            }
-            for snapshot in yearlySnapshots {
-                snapshotService.addSnapshot(snapshot)
+            // Use Firestore as source of truth - replace local data entirely
+            await MainActor.run {
+                snapshotService.monthlySnapshots = monthlySnapshots
+                snapshotService.yearlySnapshots = yearlySnapshots
+                snapshotService.saveSnapshots()
             }
             print(
-                "✅ [DashboardViewModel] Fetched \(monthlySnapshots.count) monthly and \(yearlySnapshots.count) yearly snapshots from backend"
+                "✅ [DashboardViewModel] Synced \(monthlySnapshots.count) monthly and \(yearlySnapshots.count) yearly snapshots from backend (source of truth)"
             )
 
             try Task.checkCancellation()
@@ -167,13 +164,14 @@ class DashboardViewModel: ObservableObject {
             // Fetch budget categories
             print("📥 [DashboardViewModel] Fetching budget categories from backend...")
             let backendCategories = try await backendService.fetchBudgetCategories()
-            for category in backendCategories {
-                if !budgetService.budgetCategories.contains(where: { $0.id == category.id }) {
-                    budgetService.budgetCategories.append(category)
-                }
+
+            // Use Firestore as source of truth - replace local data entirely
+            await MainActor.run {
+                budgetService.budgetCategories = backendCategories
+                budgetService.saveBudgetCategories()
             }
             print(
-                "✅ [DashboardViewModel] Fetched \(backendCategories.count) budget categories from backend"
+                "✅ [DashboardViewModel] Synced \(backendCategories.count) budget categories from backend (source of truth)"
             )
 
             try Task.checkCancellation()

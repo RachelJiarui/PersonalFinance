@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 class SnapshotService: ObservableObject {
     static let shared = SnapshotService()
@@ -178,7 +178,7 @@ class SnapshotService: ObservableObject {
 
     // MARK: - Persistence
 
-    private func saveSnapshots() {
+    func saveSnapshots() {
         if let monthlyData = try? JSONEncoder().encode(monthlySnapshots) {
             userDefaults.set(monthlyData, forKey: monthlyKey)
         }
@@ -190,12 +190,14 @@ class SnapshotService: ObservableObject {
 
     private func loadSnapshots() {
         if let data = userDefaults.data(forKey: monthlyKey),
-           let decoded = try? JSONDecoder().decode([PeriodSnapshot].self, from: data) {
+            let decoded = try? JSONDecoder().decode([PeriodSnapshot].self, from: data)
+        {
             monthlySnapshots = decoded
         }
 
         if let data = userDefaults.data(forKey: yearlyKey),
-           let decoded = try? JSONDecoder().decode([PeriodSnapshot].self, from: data) {
+            let decoded = try? JSONDecoder().decode([PeriodSnapshot].self, from: data)
+        {
             yearlySnapshots = decoded
         }
     }
