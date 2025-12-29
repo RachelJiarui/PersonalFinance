@@ -26,16 +26,20 @@ class DebtService: ObservableObject {
             let firestoreDebts = try await BackendService.shared.fetchDebts()
             print("✅ [DebtService] Fetched \(firestoreDebts.count) debts from Firestore")
 
-            await MainActor.run {
-                // Merge Firestore data with local data instead of replacing
-                // Keep local debts that aren't in Firestore yet (empty IDs)
-                let localOnlyDebts = self.debts.filter { $0.id.isEmpty }
+            // Debug: Print details of fetched debts
+            for debt in firestoreDebts {
+                print(
+                    "   - Debt: \(debt.name), ID: \(debt.id), Active: \(debt.isActive), Balance: \(debt.balance)"
+                )
+            }
 
-                // Combine: Firestore debts + local-only debts
-                self.debts = firestoreDebts + localOnlyDebts
+            await MainActor.run {
+                // Replace with Firestore data as source of truth
+                self.debts = firestoreDebts
                 self.saveDebts()
 
-                print("📊 [DebtService] Total debts after merge: \(self.debts.count)")
+                print("📊 [DebtService] Total debts: \(self.debts.count)")
+                print("📊 [DebtService] Active debts: \(self.getActiveDebts().count)")
             }
         } catch {
             print("❌ [DebtService] Error fetching debts from Firestore: \(error)")

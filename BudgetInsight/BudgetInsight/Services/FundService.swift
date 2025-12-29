@@ -26,16 +26,20 @@ class FundService: ObservableObject {
             let firestoreFunds = try await BackendService.shared.fetchFunds()
             print("✅ [FundService] Fetched \(firestoreFunds.count) funds from Firestore")
 
-            await MainActor.run {
-                // Merge Firestore data with local data instead of replacing
-                // Keep local funds that aren't in Firestore yet (empty IDs)
-                let localOnlyFunds = self.funds.filter { $0.id.isEmpty }
+            // Debug: Print details of fetched funds
+            for fund in firestoreFunds {
+                print(
+                    "   - Fund: \(fund.name), ID: \(fund.id), Active: \(fund.isActive), Balance: \(fund.balance)"
+                )
+            }
 
-                // Combine: Firestore funds + local-only funds
-                self.funds = firestoreFunds + localOnlyFunds
+            await MainActor.run {
+                // Replace with Firestore data as source of truth
+                self.funds = firestoreFunds
                 self.saveFunds()
 
-                print("📊 [FundService] Total funds after merge: \(self.funds.count)")
+                print("📊 [FundService] Total funds: \(self.funds.count)")
+                print("📊 [FundService] Active funds: \(self.getActiveFunds().count)")
             }
         } catch {
             print("❌ [FundService] Error fetching funds from Firestore: \(error)")

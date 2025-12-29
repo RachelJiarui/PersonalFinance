@@ -17,8 +17,9 @@ class BackendService: ObservableObject {
             self.baseURL = cloudRunURL
         } else {
             // Production Cloud Run URL
-            self.baseURL = "https://budgetinsight-backend-ofgbl6d3ea-uc.a.run.app/api"
+            self.baseURL = "https://budgetinsight-backend-575183170824.us-central1.run.app/api"
         }
+        print("🌐 [BackendService] Initialized with base URL: \(self.baseURL)")
     }
 
     // MARK: - Health Check
@@ -556,21 +557,31 @@ class BackendService: ObservableObject {
 
     func fetchFunds() async throws -> [Fund] {
         let url = URL(string: "\(baseURL)/funds")!
+        print("🔗 [BackendService] Fetching funds from: \(url.absoluteString)")
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
         else {
+            if let httpResponse = response as? HTTPURLResponse {
+                print("❌ [BackendService] Invalid response: HTTP \(httpResponse.statusCode)")
+            }
             throw BackendError.invalidResponse
         }
+        print("✅ [BackendService] Received funds response: HTTP 200")
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let fundsArray = json["funds"] as? [[String: Any]]
         else {
+            print("❌ [BackendService] Failed to parse JSON response")
             throw BackendError.invalidData
         }
 
-        let dateFormatter = ISO8601DateFormatter()
+        // Backend returns dates in RFC 2822 format: "Mon, 29 Dec 2025 19:03:01 GMT"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
         var funds: [Fund] = []
 
         for dict in fundsArray {
@@ -602,9 +613,12 @@ class BackendService: ObservableObject {
                     isActive: isActive
                 )
                 funds.append(fund)
+            } else {
+                print("⚠️ [BackendService] Failed to parse fund: \(dict)")
             }
         }
 
+        print("✅ [BackendService] Successfully parsed \(funds.count) funds")
         return funds
     }
 
@@ -684,21 +698,31 @@ class BackendService: ObservableObject {
 
     func fetchDebts() async throws -> [Debt] {
         let url = URL(string: "\(baseURL)/debts")!
+        print("🔗 [BackendService] Fetching debts from: \(url.absoluteString)")
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
         else {
+            if let httpResponse = response as? HTTPURLResponse {
+                print("❌ [BackendService] Invalid response: HTTP \(httpResponse.statusCode)")
+            }
             throw BackendError.invalidResponse
         }
+        print("✅ [BackendService] Received debts response: HTTP 200")
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let debtsArray = json["debts"] as? [[String: Any]]
         else {
+            print("❌ [BackendService] Failed to parse JSON response")
             throw BackendError.invalidData
         }
 
-        let dateFormatter = ISO8601DateFormatter()
+        // Backend returns dates in RFC 2822 format: "Mon, 29 Dec 2025 19:03:01 GMT"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
         var debts: [Debt] = []
 
         for dict in debtsArray {
@@ -730,9 +754,12 @@ class BackendService: ObservableObject {
                     isActive: isActive
                 )
                 debts.append(debt)
+            } else {
+                print("⚠️ [BackendService] Failed to parse debt: \(dict)")
             }
         }
 
+        print("✅ [BackendService] Successfully parsed \(debts.count) debts")
         return debts
     }
 

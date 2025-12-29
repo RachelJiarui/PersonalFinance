@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct PerennialView: View {
-    @StateObject private var fundService = FundService.shared
-    @StateObject private var debtService = DebtService.shared
+    @ObservedObject var fundService = FundService.shared
+    @ObservedObject var debtService = DebtService.shared
 
     @State private var showAddFund = false
     @State private var showAddDebt = false
@@ -345,7 +345,7 @@ struct EmptyStateView: View {
 
 struct AddFundView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var fundService = FundService.shared
+    @ObservedObject var fundService = FundService.shared
 
     @State private var name: String = ""
     @State private var description: String = ""
@@ -437,7 +437,7 @@ struct AddFundView: View {
 
 struct AddDebtView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var debtService = DebtService.shared
+    @ObservedObject var debtService = DebtService.shared
 
     @State private var name: String = ""
     @State private var description: String = ""

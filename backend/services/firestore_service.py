@@ -15,9 +15,16 @@ class FirestoreService:
 
     def __init__(self):
         """Initialize Firestore client"""
-        self.db = firestore.Client()
+        # Get project ID from environment or use default
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "personal-finance-482417")
+
+        # Initialize Firestore client with explicit project
+        # This will use Application Default Credentials (ADC) which works both locally and on Cloud Run
+        self.db = firestore.Client(project=project_id)
         self.user_email = "rachel.j.chen@gmail.com"
-        print(f"✅ Connected to Firestore (single-user mode: {self.user_email})")
+        print(
+            f"✅ Connected to Firestore (single-user mode: {self.user_email}, project: {project_id})"
+        )
 
     # ========================================================================
     # APP SETTINGS
@@ -488,13 +495,22 @@ class FirestoreService:
         Args:
             include_inactive: If True, returns all funds. If False, only active ones.
         """
+        print(
+            f"🔍 [FirestoreService] Fetching funds (include_inactive={include_inactive})"
+        )
         query = self.db.collection("funds")
 
         if not include_inactive:
             query = query.where("is_active", "==", True)
 
         funds = query.stream()
-        return [{"id": fund.id, **fund.to_dict()} for fund in funds]
+        funds_list = [{"id": fund.id, **fund.to_dict()} for fund in funds]
+        print(f"✅ [FirestoreService] Found {len(funds_list)} funds")
+        for fund in funds_list:
+            print(
+                f"   - {fund.get('name', 'N/A')}: active={fund.get('is_active', 'N/A')}, balance={fund.get('balance', 'N/A')}"
+            )
+        return funds_list
 
     def get_fund(self, fund_id: str) -> Optional[Dict]:
         """Get a specific fund"""
@@ -549,13 +565,22 @@ class FirestoreService:
         Args:
             include_inactive: If True, returns all debts. If False, only active ones.
         """
+        print(
+            f"🔍 [FirestoreService] Fetching debts (include_inactive={include_inactive})"
+        )
         query = self.db.collection("debts")
 
         if not include_inactive:
             query = query.where("is_active", "==", True)
 
         debts = query.stream()
-        return [{"id": debt.id, **debt.to_dict()} for debt in debts]
+        debts_list = [{"id": debt.id, **debt.to_dict()} for debt in debts]
+        print(f"✅ [FirestoreService] Found {len(debts_list)} debts")
+        for debt in debts_list:
+            print(
+                f"   - {debt.get('name', 'N/A')}: active={debt.get('is_active', 'N/A')}, balance={debt.get('balance', 'N/A')}"
+            )
+        return debts_list
 
     def get_debt(self, debt_id: str) -> Optional[Dict]:
         """Get a specific debt"""
