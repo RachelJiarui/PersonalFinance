@@ -1,6 +1,7 @@
 import Foundation
 
 /// Represents a financial transaction (always manually entered)
+/// Note: Allocations to categories/funds/debts are stored separately in TransactionAllocation
 struct Transaction: Identifiable, Codable {
     // ID - Firestore auto-generates, empty until saved to backend
     var id: String
@@ -9,7 +10,6 @@ struct Transaction: Identifiable, Codable {
     let amount: Double
     let date: Date
     let title: String
-    let categoryId: String  // BudgetCategory ID (Firestore auto-generated)
     let isExpense: Bool  // True if expense, False if income
 
     // Automatic
@@ -20,14 +20,13 @@ struct Transaction: Identifiable, Codable {
 
     init(
         id: String = "", amount: Double, date: Date, title: String,
-        categoryId: String, isExpense: Bool, timestamp: Date = Date(),
+        isExpense: Bool, timestamp: Date = Date(),
         linkedEmailAlertId: String? = nil
     ) {
         self.id = id
         self.amount = amount
         self.date = date
         self.title = title
-        self.categoryId = categoryId
         self.isExpense = isExpense
         self.timestamp = timestamp
         self.linkedEmailAlertId = linkedEmailAlertId

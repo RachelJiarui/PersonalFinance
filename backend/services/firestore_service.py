@@ -478,6 +478,212 @@ class FirestoreService:
         self.db.collection("user_incomes").document(income_id).delete()
 
     # ========================================================================
+    # FUNDS
+    # ========================================================================
+
+    def get_funds(self, include_inactive: bool = False) -> List[Dict]:
+        """
+        Get funds
+
+        Args:
+            include_inactive: If True, returns all funds. If False, only active ones.
+        """
+        query = self.db.collection("funds")
+
+        if not include_inactive:
+            query = query.where("is_active", "==", True)
+
+        funds = query.stream()
+        return [{"id": fund.id, **fund.to_dict()} for fund in funds]
+
+    def get_fund(self, fund_id: str) -> Optional[Dict]:
+        """Get a specific fund"""
+        doc = self.db.collection("funds").document(fund_id).get()
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_fund(self, fund_data: Dict) -> str:
+        """
+        Create a new fund
+
+        Expected fields:
+        - name: str
+        - icon: str (SF Symbol name)
+        - description: str
+        - balance: float
+        - goal: float | null (optional)
+        - deadline: str | null (ISO8601, optional)
+        - is_active: bool (default True)
+        """
+        fund_data["created_at"] = firestore.SERVER_TIMESTAMP
+        fund_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        fund_data["is_active"] = fund_data.get("is_active", True)
+
+        # Remove id if present - let Firestore generate it
+        fund_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("funds").add(fund_data)
+        return doc_ref.id
+
+    def update_fund(self, fund_id: str, updates: Dict):
+        """Update a fund"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("funds").document(fund_id).update(updates)
+
+    def delete_fund(self, fund_id: str):
+        """Soft delete a fund (set is_active to False)"""
+        self.db.collection("funds").document(fund_id).update(
+            {"is_active": False, "updated_at": firestore.SERVER_TIMESTAMP}
+        )
+
+    # ========================================================================
+    # DEBTS
+    # ========================================================================
+
+    def get_debts(self, include_inactive: bool = False) -> List[Dict]:
+        """
+        Get debts
+
+        Args:
+            include_inactive: If True, returns all debts. If False, only active ones.
+        """
+        query = self.db.collection("debts")
+
+        if not include_inactive:
+            query = query.where("is_active", "==", True)
+
+        debts = query.stream()
+        return [{"id": debt.id, **debt.to_dict()} for debt in debts]
+
+    def get_debt(self, debt_id: str) -> Optional[Dict]:
+        """Get a specific debt"""
+        doc = self.db.collection("debts").document(debt_id).get()
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_debt(self, debt_data: Dict) -> str:
+        """
+        Create a new debt
+
+        Expected fields:
+        - name: str
+        - icon: str (SF Symbol name)
+        - description: str
+        - balance: float
+        - goal: float (REQUIRED)
+        - deadline: str | null (ISO8601, optional)
+        - is_active: bool (default True)
+        """
+        debt_data["created_at"] = firestore.SERVER_TIMESTAMP
+        debt_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        debt_data["is_active"] = debt_data.get("is_active", True)
+
+        # Remove id if present - let Firestore generate it
+        debt_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("debts").add(debt_data)
+        return doc_ref.id
+
+    def update_debt(self, debt_id: str, updates: Dict):
+        """Update a debt"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("debts").document(debt_id).update(updates)
+
+    def delete_debt(self, debt_id: str):
+        """Soft delete a debt (set is_active to False)"""
+        self.db.collection("debts").document(debt_id).update(
+            {"is_active": False, "updated_at": firestore.SERVER_TIMESTAMP}
+        )
+
+    # ========================================================================
+    # TRANSACTION ALLOCATIONS
+    # ========================================================================
+
+    def get_allocations(
+        self,
+        transaction_id: Optional[str] = None,
+        destination_type: Optional[str] = None,
+        destination_id: Optional[str] = None,
+        limit: int = 1000,
+    ) -> List[Dict]:
+        """
+        Get transaction allocations with optional filtering
+
+        Args:
+            transaction_id: Filter by transaction ID
+            destination_type: Filter by destination type ('category', 'fund', 'debt')
+            destination_id: Filter by destination ID
+            limit: Maximum number of allocations
+        """
+        query = self.db.collection("transaction_allocations")
+
+        if transaction_id:
+            query = query.where("transaction_id", "==", transaction_id)
+
+        if destination_type:
+            query = query.where("destination_type", "==", destination_type)
+
+        if destination_id:
+            query = query.where("destination_id", "==", destination_id)
+
+        allocations = (
+            query.order_by("allocated_at", direction=firestore.Query.DESCENDING)
+            .limit(limit)
+            .stream()
+        )
+
+        return [{"id": alloc.id, **alloc.to_dict()} for alloc in allocations]
+
+    def get_allocation(self, allocation_id: str) -> Optional[Dict]:
+        """Get a specific allocation"""
+        doc = (
+            self.db.collection("transaction_allocations").document(allocation_id).get()
+        )
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_allocation(self, allocation_data: Dict) -> str:
+        """
+        Create a new allocation
+
+        Expected fields:
+        - transaction_id: str
+        - destination_type: str ('category', 'fund', 'debt')
+        - destination_id: str
+        - amount: float
+        - allocated_at: str (ISO8601, defaults to now)
+        """
+        allocation_data["created_at"] = firestore.SERVER_TIMESTAMP
+        allocation_data["updated_at"] = firestore.SERVER_TIMESTAMP
+
+        # Set allocated_at if not provided
+        if "allocated_at" not in allocation_data:
+            allocation_data["allocated_at"] = datetime.now().isoformat()
+
+        # Remove id if present - let Firestore generate it
+        allocation_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("transaction_allocations").add(allocation_data)
+        return doc_ref.id
+
+    def update_allocation(self, allocation_id: str, updates: Dict):
+        """Update an allocation"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("transaction_allocations").document(allocation_id).update(
+            updates
+        )
+
+    def delete_allocation(self, allocation_id: str):
+        """Delete an allocation"""
+        self.db.collection("transaction_allocations").document(allocation_id).delete()
+
+    # ========================================================================
     # SNAPSHOTS
     # ========================================================================
 

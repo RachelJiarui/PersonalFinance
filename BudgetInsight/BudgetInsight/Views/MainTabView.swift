@@ -10,6 +10,7 @@ struct MainTabView: View {
     enum Tab {
         case dashboard
         case budget
+        case perennial
         case history
     }
 
@@ -32,6 +33,14 @@ struct MainTabView: View {
                 Label("My Budget", systemImage: "dollarsign.circle.fill")
             }
             .tag(Tab.budget)
+
+            NavigationView {
+                PerennialView()
+            }
+            .tabItem {
+                Label("Perennial", systemImage: "leaf.fill")
+            }
+            .tag(Tab.perennial)
 
             NavigationView {
                 GrandSchemeView()

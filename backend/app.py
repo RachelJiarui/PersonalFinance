@@ -481,6 +481,191 @@ def delete_user_income(income_id):
 
 
 # ============================================================================
+# FUNDS
+# ============================================================================
+
+
+@app.route("/api/funds", methods=["GET"])
+def get_funds():
+    """Get all funds"""
+    try:
+        funds = db.get_funds()
+        return jsonify({"funds": funds}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/funds/<fund_id>", methods=["GET"])
+def get_fund(fund_id):
+    """Get a specific fund"""
+    try:
+        fund = db.get_fund(fund_id)
+        if not fund:
+            return jsonify({"error": "Fund not found"}), 404
+        return jsonify(fund), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/funds", methods=["POST"])
+def create_fund():
+    """Create a new fund"""
+    try:
+        fund_data = request.get_json()
+        fund_id = db.create_fund(fund_data)
+        return jsonify({"success": True, "id": fund_id}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/funds/<fund_id>", methods=["PUT"])
+def update_fund(fund_id):
+    """Update a fund"""
+    try:
+        updates = request.get_json()
+        db.update_fund(fund_id, updates)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/funds/<fund_id>", methods=["DELETE"])
+def delete_fund(fund_id):
+    """Delete a fund (soft delete)"""
+    try:
+        db.delete_fund(fund_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# DEBTS
+# ============================================================================
+
+
+@app.route("/api/debts", methods=["GET"])
+def get_debts():
+    """Get all debts"""
+    try:
+        debts = db.get_debts()
+        return jsonify({"debts": debts}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/debts/<debt_id>", methods=["GET"])
+def get_debt(debt_id):
+    """Get a specific debt"""
+    try:
+        debt = db.get_debt(debt_id)
+        if not debt:
+            return jsonify({"error": "Debt not found"}), 404
+        return jsonify(debt), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/debts", methods=["POST"])
+def create_debt():
+    """Create a new debt"""
+    try:
+        debt_data = request.get_json()
+        debt_id = db.create_debt(debt_data)
+        return jsonify({"success": True, "id": debt_id}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/debts/<debt_id>", methods=["PUT"])
+def update_debt(debt_id):
+    """Update a debt"""
+    try:
+        updates = request.get_json()
+        db.update_debt(debt_id, updates)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/debts/<debt_id>", methods=["DELETE"])
+def delete_debt(debt_id):
+    """Delete a debt (soft delete)"""
+    try:
+        db.delete_debt(debt_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# TRANSACTION ALLOCATIONS
+# ============================================================================
+
+
+@app.route("/api/allocations", methods=["GET"])
+def get_allocations():
+    """Get allocations (query params: ?transaction_id=X&destination_type=Y&destination_id=Z)"""
+    try:
+        transaction_id = request.args.get("transaction_id")
+        destination_type = request.args.get("destination_type")
+        destination_id = request.args.get("destination_id")
+
+        allocations = db.get_allocations(
+            transaction_id=transaction_id,
+            destination_type=destination_type,
+            destination_id=destination_id,
+        )
+        return jsonify({"allocations": allocations}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/allocations/<allocation_id>", methods=["GET"])
+def get_allocation(allocation_id):
+    """Get a specific allocation"""
+    try:
+        allocation = db.get_allocation(allocation_id)
+        if not allocation:
+            return jsonify({"error": "Allocation not found"}), 404
+        return jsonify(allocation), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/allocations", methods=["POST"])
+def create_allocation():
+    """Create a new allocation"""
+    try:
+        allocation_data = request.get_json()
+        allocation_id = db.create_allocation(allocation_data)
+        return jsonify({"success": True, "id": allocation_id}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/allocations/<allocation_id>", methods=["PUT"])
+def update_allocation(allocation_id):
+    """Update an allocation"""
+    try:
+        updates = request.get_json()
+        db.update_allocation(allocation_id, updates)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/allocations/<allocation_id>", methods=["DELETE"])
+def delete_allocation(allocation_id):
+    """Delete an allocation"""
+    try:
+        db.delete_allocation(allocation_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
 # SNAPSHOTS
 # ============================================================================
 

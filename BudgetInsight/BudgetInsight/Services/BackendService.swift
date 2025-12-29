@@ -81,7 +81,6 @@ class BackendService: ObservableObject {
             if let id = dict["id"] as? String,
                 let amount = dict["amount"] as? Double,
                 let title = dict["title"] as? String,
-                let categoryId = dict["category_id"] as? String,
                 let isExpense = dict["is_expense"] as? Bool,
                 let dateString = dict["date"] as? String,
                 let date = dateFormatter.date(from: dateString),
@@ -96,7 +95,6 @@ class BackendService: ObservableObject {
                     amount: amount,
                     date: date,
                     title: title,
-                    categoryId: categoryId,
                     isExpense: isExpense,
                     timestamp: timestamp,
                     linkedEmailAlertId: linkedEmailAlertId
@@ -118,7 +116,6 @@ class BackendService: ObservableObject {
         var body: [String: Any] = [
             "amount": transaction.amount,
             "title": transaction.title,
-            "category_id": transaction.categoryId,
             "is_expense": transaction.isExpense,
             "date": dateFormatter.string(from: transaction.date),
             "timestamp": dateFormatter.string(from: transaction.timestamp),
@@ -545,6 +542,391 @@ class BackendService: ObservableObject {
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    // MARK: - Funds
+
+    func fetchFunds() async throws -> [Fund] {
+        let url = URL(string: "\(baseURL)/funds")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let fundsArray = json["funds"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        var funds: [Fund] = []
+
+        for dict in fundsArray {
+            if let id = dict["id"] as? String,
+                let name = dict["name"] as? String,
+                let icon = dict["icon"] as? String,
+                let description = dict["description"] as? String,
+                let balance = dict["balance"] as? Double,
+                let isActive = dict["is_active"] as? Bool,
+                let createdAtString = dict["created_at"] as? String,
+                let createdAt = dateFormatter.date(from: createdAtString)
+            {
+
+                let goal = dict["goal"] as? Double
+                var deadline: Date?
+                if let deadlineString = dict["deadline"] as? String {
+                    deadline = dateFormatter.date(from: deadlineString)
+                }
+
+                let fund = Fund(
+                    id: id,
+                    name: name,
+                    icon: icon,
+                    description: description,
+                    balance: balance,
+                    goal: goal,
+                    deadline: deadline,
+                    createdAt: createdAt,
+                    isActive: isActive
+                )
+                funds.append(fund)
+            }
+        }
+
+        return funds
+    }
+
+    func createFund(_ fund: Fund) async throws -> String {
+        let url = URL(string: "\(baseURL)/funds")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let dateFormatter = ISO8601DateFormatter()
+        var body: [String: Any] = [
+            "name": fund.name,
+            "icon": fund.icon,
+            "description": fund.description,
+            "balance": fund.balance,
+            "is_active": fund.isActive,
+            "created_at": dateFormatter.string(from: fund.createdAt),
+        ]
+
+        if let goal = fund.goal {
+            body["goal"] = goal
+        }
+        if let deadline = fund.deadline {
+            body["deadline"] = dateFormatter.string(from: deadline)
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
+
+    func updateFund(fundId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/funds/\(fundId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    func deleteFund(_ fundId: String) async throws {
+        let url = URL(string: "\(baseURL)/funds/\(fundId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    // MARK: - Debts
+
+    func fetchDebts() async throws -> [Debt] {
+        let url = URL(string: "\(baseURL)/debts")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let debtsArray = json["debts"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        var debts: [Debt] = []
+
+        for dict in debtsArray {
+            if let id = dict["id"] as? String,
+                let name = dict["name"] as? String,
+                let icon = dict["icon"] as? String,
+                let description = dict["description"] as? String,
+                let balance = dict["balance"] as? Double,
+                let goal = dict["goal"] as? Double,
+                let isActive = dict["is_active"] as? Bool,
+                let createdAtString = dict["created_at"] as? String,
+                let createdAt = dateFormatter.date(from: createdAtString)
+            {
+
+                var deadline: Date?
+                if let deadlineString = dict["deadline"] as? String {
+                    deadline = dateFormatter.date(from: deadlineString)
+                }
+
+                let debt = Debt(
+                    id: id,
+                    name: name,
+                    icon: icon,
+                    description: description,
+                    balance: balance,
+                    goal: goal,
+                    deadline: deadline,
+                    createdAt: createdAt,
+                    isActive: isActive
+                )
+                debts.append(debt)
+            }
+        }
+
+        return debts
+    }
+
+    func createDebt(_ debt: Debt) async throws -> String {
+        let url = URL(string: "\(baseURL)/debts")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let dateFormatter = ISO8601DateFormatter()
+        var body: [String: Any] = [
+            "name": debt.name,
+            "icon": debt.icon,
+            "description": debt.description,
+            "balance": debt.balance,
+            "goal": debt.goal,
+            "is_active": debt.isActive,
+            "created_at": dateFormatter.string(from: debt.createdAt),
+        ]
+
+        if let deadline = debt.deadline {
+            body["deadline"] = dateFormatter.string(from: deadline)
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
+
+    func updateDebt(debtId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/debts/\(debtId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    func deleteDebt(_ debtId: String) async throws {
+        let url = URL(string: "\(baseURL)/debts/\(debtId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    // MARK: - Transaction Allocations
+
+    func fetchAllocations(
+        transactionId: String? = nil, destinationType: AllocationType? = nil,
+        destinationId: String? = nil
+    ) async throws -> [TransactionAllocation] {
+        var urlString = "\(baseURL)/allocations"
+        var queryParams: [String] = []
+
+        if let transactionId = transactionId {
+            queryParams.append("transaction_id=\(transactionId)")
+        }
+        if let destinationType = destinationType {
+            queryParams.append("destination_type=\(destinationType.rawValue)")
+        }
+        if let destinationId = destinationId {
+            queryParams.append("destination_id=\(destinationId)")
+        }
+
+        if !queryParams.isEmpty {
+            urlString += "?" + queryParams.joined(separator: "&")
+        }
+
+        let url = URL(string: urlString)!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let allocationsArray = json["allocations"] as? [[String: Any]]
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        var allocations: [TransactionAllocation] = []
+
+        for dict in allocationsArray {
+            if let id = dict["id"] as? String,
+                let transactionId = dict["transaction_id"] as? String,
+                let destinationTypeString = dict["destination_type"] as? String,
+                let destinationType = AllocationType(rawValue: destinationTypeString),
+                let destinationId = dict["destination_id"] as? String,
+                let amount = dict["amount"] as? Double,
+                let allocatedAtString = dict["allocated_at"] as? String,
+                let allocatedAt = dateFormatter.date(from: allocatedAtString)
+            {
+
+                let allocation = TransactionAllocation(
+                    id: id,
+                    transactionId: transactionId,
+                    destinationType: destinationType,
+                    destinationId: destinationId,
+                    amount: amount,
+                    allocatedAt: allocatedAt
+                )
+                allocations.append(allocation)
+            }
+        }
+
+        return allocations
+    }
+
+    func createAllocation(_ allocation: TransactionAllocation) async throws -> String {
+        let url = URL(string: "\(baseURL)/allocations")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let dateFormatter = ISO8601DateFormatter()
+        let body: [String: Any] = [
+            "transaction_id": allocation.transactionId,
+            "destination_type": allocation.destinationType.rawValue,
+            "destination_id": allocation.destinationId,
+            "amount": allocation.amount,
+            "allocated_at": dateFormatter.string(from: allocation.allocatedAt),
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
+
+    func updateAllocation(allocationId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/allocations/\(allocationId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    func deleteAllocation(_ allocationId: String) async throws {
+        let url = URL(string: "\(baseURL)/allocations/\(allocationId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
 
         let (_, response) = try await URLSession.shared.data(for: request)
 

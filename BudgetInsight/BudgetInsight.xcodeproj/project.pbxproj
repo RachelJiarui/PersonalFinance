@@ -38,6 +38,16 @@
 		CCF192332EFF47050053873B /* SnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192312EFF47050053873B /* SnapshotService.swift */; };
 		CCF192342EFF47050053873B /* TaxService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192322EFF47050053873B /* TaxService.swift */; };
 		CCF192352EFF47060053873B /* BackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192362EFF47060053873B /* BackendService.swift */; };
+		27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3677BCF0A539CB986B5C63FD /* Fund.swift */; };
+		0BB1920308E41E8F573918BD /* Debt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 049950824A4A647CD9DCBF71 /* Debt.swift */; };
+		0086C9BFDE043BD5E65AED6C /* TransactionAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */; };
+		CF8860D17823D2D67FC6BE07 /* FundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA4D4D040B401A2E2324017C /* FundService.swift */; };
+		1CD1A1B56AA728C87AFB942E /* DebtService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DBF7F264C2F518E52B125 /* DebtService.swift */; };
+		22FAC9F59FEC92C48CD8FB82 /* AllocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */; };
+		879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E0DAAE7F3A4695195AF185 /* PerennialView.swift */; };
+		4731ECEAC2C7CCF59B3E2F1A /* FundDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */; };
+		4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE3D54C69884491F123DF6B /* DebtDetailView.swift */; };
+		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +83,16 @@
 		CCF192312EFF47050053873B /* SnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotService.swift; sourceTree = "<group>"; };
 		CCF192322EFF47050053873B /* TaxService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxService.swift; sourceTree = "<group>"; };
 		CCF192362EFF47060053873B /* BackendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendService.swift; sourceTree = "<group>"; };
+		3677BCF0A539CB986B5C63FD /* Fund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fund.swift; sourceTree = "<group>"; };
+		049950824A4A647CD9DCBF71 /* Debt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debt.swift; sourceTree = "<group>"; };
+		D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAllocation.swift; sourceTree = "<group>"; };
+		BA4D4D040B401A2E2324017C /* FundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundService.swift; sourceTree = "<group>"; };
+		DF9DBF7F264C2F518E52B125 /* DebtService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtService.swift; sourceTree = "<group>"; };
+		92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationService.swift; sourceTree = "<group>"; };
+		73E0DAAE7F3A4695195AF185 /* PerennialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerennialView.swift; sourceTree = "<group>"; };
+		A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundDetailView.swift; sourceTree = "<group>"; };
+		ABE3D54C69884491F123DF6B /* DebtDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtDetailView.swift; sourceTree = "<group>"; };
+		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +136,9 @@
 				CCF192182EFF46B90053873B /* PeriodSnapshot.swift */,
 				CCF192192EFF46B90053873B /* UserIncome.swift */,
 				CCF192372EFFNEW1 /* BudgetPlan.swift */,
+				3677BCF0A539CB986B5C63FD /* Fund.swift */,
+				049950824A4A647CD9DCBF71 /* Debt.swift */,
+				D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -133,6 +156,10 @@
 				1A000045 /* EmailSetupView.swift */,
 				1A000048 /* ManualEntryView.swift */,
 				1A000049 /* NeedsEntryView.swift */,
+				73E0DAAE7F3A4695195AF185 /* PerennialView.swift */,
+				A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */,
+				ABE3D54C69884491F123DF6B /* DebtDetailView.swift */,
+				BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -157,6 +184,9 @@
 				1A000043 /* EmailService.swift */,
 				1A000044 /* TransactionStorageService.swift */,
 				CCF192362EFF47060053873B /* BackendService.swift */,
+				BA4D4D040B401A2E2324017C /* FundService.swift */,
+				DF9DBF7F264C2F518E52B125 /* DebtService.swift */,
+				92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -281,6 +311,16 @@
 				1A000040 /* ManualEntryView.swift in Sources */,
 				1A000041 /* NeedsEntryView.swift in Sources */,
 				CCF192352EFF47060053873B /* BackendService.swift in Sources */,
+				27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */,
+				0BB1920308E41E8F573918BD /* Debt.swift in Sources */,
+				0086C9BFDE043BD5E65AED6C /* TransactionAllocation.swift in Sources */,
+				CF8860D17823D2D67FC6BE07 /* FundService.swift in Sources */,
+				1CD1A1B56AA728C87AFB942E /* DebtService.swift in Sources */,
+				22FAC9F59FEC92C48CD8FB82 /* AllocationService.swift in Sources */,
+				879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */,
+				4731ECEAC2C7CCF59B3E2F1A /* FundDetailView.swift in Sources */,
+				4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */,
+				91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,6 +4,7 @@ struct GrandSchemeView: View {
     @EnvironmentObject var viewModel: HistoryViewModel
     @StateObject private var transactionService = TransactionStorageService.shared
     @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var allocationService = AllocationService.shared
     @State private var selectedTab: GrandSchemeTab = .expenditureOverview
 
     enum GrandSchemeTab {
@@ -37,7 +38,8 @@ struct GrandSchemeView: View {
             if selectedTab == .allTransactions {
                 AllTransactionsView(
                     transactions: transactionService.transactions,
-                    budgetService: budgetService
+                    budgetService: budgetService,
+                    allocationService: allocationService
                 )
             } else {
                 ExpenditureOverviewView()
@@ -74,6 +76,7 @@ struct TabButton: View {
 struct AllTransactionsView: View {
     let transactions: [Transaction]
     let budgetService: BudgetService
+    let allocationService: AllocationService
 
     @State private var visibleCount: Int = 20
     private let pageSize = 20
@@ -100,7 +103,7 @@ struct AllTransactionsView: View {
                     ForEach(displayedTransactions) { transaction in
                         TransactionRowView(
                             transaction: transaction,
-                            category: budgetService.getCategoryById(transaction.categoryId)
+                            category: getPrimaryCategoryForTransaction(transaction)
                         )
                         Divider()
                             .padding(.leading, 60)
@@ -130,6 +133,20 @@ struct AllTransactionsView: View {
 
     private func loadMore() {
         visibleCount = min(visibleCount + pageSize, sortedTransactions.count)
+    }
+
+    private func getPrimaryCategoryForTransaction(_ transaction: Transaction) -> BudgetCategory? {
+        // Get the first category allocation for this transaction
+        let allAllocations = allocationService.allocations
+        let categoryAllocations = allAllocations.filter { allocation in
+            allocation.transactionId == transaction.id && allocation.destinationType == .category
+        }
+
+        if let firstAllocation = categoryAllocations.first {
+            return budgetService.getCategoryById(firstAllocation.destinationId)
+        }
+
+        return nil
     }
 }
 

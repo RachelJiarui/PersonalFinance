@@ -1,18 +1,31 @@
 import SwiftUI
 
+struct AllocationItem: Identifiable {
+    let id = UUID()
+    var destinationType: AllocationType
+    var destinationId: String
+    var amount: Double
+}
+
 struct ManualEntryView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var storageService = TransactionStorageService.shared
     @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var fundService = FundService.shared
+    @StateObject private var debtService = DebtService.shared
+    @StateObject private var allocationService = AllocationService.shared
     @StateObject private var backendService = BackendService.shared
 
     // Form fields matching Transaction model
     @State private var amount: String = ""
     @State private var title: String = ""
     @State private var date: Date = Date()
-    @State private var selectedCategoryId: String = ""
     @State private var isExpense: Bool = true
     @State private var selectedAlertId: String? = nil
+
+    // Allocation management
+    @State private var allocations: [AllocationItem] = []
+    @State private var showAddAllocation: Bool = false
 
     // Matching
     @State private var matchingAlerts: [TransactionAlert] = []
@@ -63,46 +76,6 @@ struct ManualEntryView: View {
                     .onChange(of: date) { _ in
                         updateMatchingAlerts()
                     }
-
-                    // Category Picker
-                    if budgetService.getActiveCategories().isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.orange)
-                                Text("No Categories Available")
-                                    .foregroundColor(.orange)
-                            }
-                            Text(
-                                "Please create budget categories in the 'My Budget' tab before adding transactions."
-                            )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    } else {
-                        NavigationLink(
-                            destination: CategorySelectionView(
-                                selectedCategoryId: $selectedCategoryId,
-                                categories: budgetService.getActiveCategories())
-                        ) {
-                            HStack {
-                                Text("Category")
-                                Spacer()
-                                if let selectedCategory = budgetService.getActiveCategories().first(
-                                    where: { $0.id == selectedCategoryId })
-                                {
-                                    Image(systemName: selectedCategory.icon)
-                                        .foregroundColor(.blue)
-                                    Text(selectedCategory.name)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Text("Select Category")
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                    }
                 }
 
                 // MARK: - Transaction Type (Checkbox style)
@@ -119,6 +92,39 @@ struct ManualEntryView: View {
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: isExpense ? .red : .green))
+                }
+
+                // MARK: - Allocations
+                Section(
+                    header: HStack {
+                        Text("Allocations")
+                        Spacer()
+                        Text(allocationStatusText)
+                            .font(.caption)
+                            .foregroundColor(isAllocationValid ? .green : .orange)
+                    }
+                ) {
+                    if allocations.isEmpty {
+                        Text("No allocations yet. Add at least one allocation.")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(allocations) { allocation in
+                            AllocationRow(
+                                allocation: allocation,
+                                onDelete: {
+                                    deleteAllocation(allocation)
+                                }
+                            )
+                        }
+                    }
+
+                    Button(action: {
+                        showAddAllocation = true
+                    }) {
+                        Label("Add Allocation", systemImage: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                    }
                 }
 
                 // MARK: - Link to Transaction Alert (Optional)
@@ -201,6 +207,16 @@ struct ManualEntryView: View {
                     .disabled(isSaving)
                 }
             }
+            .sheet(isPresented: $showAddAllocation) {
+                AddAllocationView(
+                    transactionAmount: Double(amount) ?? 0.0,
+                    currentAllocations: allocations,
+                    isExpense: isExpense,
+                    onAdd: { newAllocation in
+                        allocations.append(newAllocation)
+                    }
+                )
+            }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -215,24 +231,37 @@ struct ManualEntryView: View {
     // MARK: - Computed Properties
 
     private var isFormValid: Bool {
-        // Check if categories exist
-        guard !budgetService.getActiveCategories().isEmpty else {
-            print("❌ [ManualEntry] Form invalid: No categories")
+        let hasAmount = !amount.isEmpty && Double(amount) != nil
+        let hasTitle = !title.isEmpty
+        let hasValidAllocations = isAllocationValid
+
+        return hasAmount && hasTitle && hasValidAllocations
+    }
+
+    private var isAllocationValid: Bool {
+        guard let amountValue = Double(amount), amountValue > 0 else {
             return false
         }
 
-        // Check required fields
-        let isValid =
-            !amount.isEmpty && !title.isEmpty && !selectedCategoryId.isEmpty
-            && Double(amount) != nil
+        let totalAllocated = allocations.reduce(0.0) { $0 + $1.amount }
+        return abs(totalAllocated - amountValue) < 0.01
+    }
 
-        if !isValid {
-            print(
-                "❌ [ManualEntry] Form invalid - amount: '\(amount)', title: '\(title)', categoryId: '\(selectedCategoryId)'"
-            )
+    private var allocationStatusText: String {
+        guard let amountValue = Double(amount), amountValue > 0 else {
+            return ""
         }
 
-        return isValid
+        let totalAllocated = allocations.reduce(0.0) { $0 + $1.amount }
+        let remaining = amountValue - totalAllocated
+
+        if abs(remaining) < 0.01 {
+            return "✓ Fully Allocated"
+        } else if remaining > 0 {
+            return "$\(String(format: "%.2f", remaining)) remaining"
+        } else {
+            return "$\(String(format: "%.2f", abs(remaining))) over"
+        }
     }
 
     // MARK: - Methods
@@ -241,23 +270,6 @@ struct ManualEntryView: View {
         // Load all unresolved alerts
         availableAlerts = storageService.getUnlinkedAlerts()
 
-        // Debug: Print all categories and their IDs
-        let categories = budgetService.getActiveCategories()
-        print("🔍 [ManualEntry] Available categories:")
-        for category in categories {
-            print("   - \(category.name): id='\(category.id)' (isEmpty: \(category.id.isEmpty))")
-        }
-
-        // Set default category if available
-        if selectedCategoryId.isEmpty, let firstCategory = categories.first,
-            !firstCategory.id.isEmpty
-        {
-            selectedCategoryId = firstCategory.id
-            print(
-                "✅ [ManualEntry] Auto-selected category: \(firstCategory.name) (id: \(firstCategory.id))"
-            )
-        }
-
         // Pre-fill if alert was provided
         if let alert = prefilledAlert {
             amount = String(format: "%.2f", alert.amount)
@@ -265,6 +277,20 @@ struct ManualEntryView: View {
             date = alert.date
             selectedAlertId = alert.id
             updateMatchingAlerts()
+        }
+
+        // Create default allocation if amount is set
+        if !amount.isEmpty, let amountValue = Double(amount), allocations.isEmpty {
+            // Default to first active category if available
+            if let firstCategory = budgetService.getActiveCategories().first {
+                allocations.append(
+                    AllocationItem(
+                        destinationType: .category,
+                        destinationId: firstCategory.id,
+                        amount: amountValue
+                    )
+                )
+            }
         }
     }
 
@@ -286,19 +312,23 @@ struct ManualEntryView: View {
         }
     }
 
+    private func deleteAllocation(_ allocation: AllocationItem) {
+        allocations.removeAll { $0.id == allocation.id }
+    }
+
     private func saveTransaction() {
         guard let amountValue = Double(amount) else {
             showErrorAlert("Please enter a valid amount")
             return
         }
 
-        guard !selectedCategoryId.isEmpty else {
-            showErrorAlert("Please select a category")
+        guard !allocations.isEmpty else {
+            showErrorAlert("Please add at least one allocation")
             return
         }
 
-        guard !budgetService.getActiveCategories().isEmpty else {
-            showErrorAlert("Please create budget categories in 'My Budget' tab first")
+        guard isAllocationValid else {
+            showErrorAlert("Allocations must equal the transaction amount")
             return
         }
 
@@ -310,7 +340,6 @@ struct ManualEntryView: View {
             amount: amountValue,
             date: date,
             title: title,
-            categoryId: selectedCategoryId,
             isExpense: isExpense,
             timestamp: Date(),
             linkedEmailAlertId: selectedAlertId
@@ -328,11 +357,21 @@ struct ManualEntryView: View {
                 // Save locally
                 storageService.saveTransaction(transaction)
 
+                // Create allocations
+                for allocation in allocations {
+                    _ = allocationService.createAllocation(
+                        transactionId: firestoreId,
+                        destinationType: allocation.destinationType,
+                        destinationId: allocation.destinationId,
+                        amount: allocation.amount
+                    )
+                }
+
                 // If linked to alert, update alert to link back to transaction
                 if let alertId = selectedAlertId {
                     storageService.linkAlert(id: alertId, toTransactionId: firestoreId)
 
-                    // Try to update backend link (may fail if alert doesn't exist in Firestore)
+                    // Try to update backend link
                     do {
                         try await backendService.linkTransactionToAlert(
                             transactionId: firestoreId,
@@ -341,9 +380,8 @@ struct ManualEntryView: View {
                         print("✅ [ManualEntry] Linked transaction to alert in Firestore")
                     } catch {
                         print(
-                            "⚠️ [ManualEntry] Could not link alert in Firestore (alert may not exist): \(error)"
+                            "⚠️ [ManualEntry] Could not link alert in Firestore: \(error)"
                         )
-                        // Don't fail the whole transaction - it was saved successfully
                     }
                 }
 
@@ -388,37 +426,288 @@ struct ManualEntryView: View {
     }
 }
 
-// MARK: - Category Selection View
+// MARK: - Allocation Row
 
-struct CategorySelectionView: View {
-    @Binding var selectedCategoryId: String
-    let categories: [BudgetCategory]
-    @Environment(\.dismiss) var dismiss
+struct AllocationRow: View {
+    let allocation: AllocationItem
+    let onDelete: () -> Void
+
+    @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var fundService = FundService.shared
+    @StateObject private var debtService = DebtService.shared
 
     var body: some View {
-        List {
-            ForEach(categories) { category in
-                Button(action: {
-                    selectedCategoryId = category.id
-                    dismiss()
-                }) {
-                    HStack {
-                        Image(systemName: category.icon)
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-                        Text(category.name)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        if selectedCategoryId == category.id {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
+        HStack {
+            Image(systemName: destinationIcon)
+                .foregroundColor(destinationColor)
+                .frame(width: 30)
+
+            VStack(alignment: .leading) {
+                Text(destinationName)
+                    .font(.body)
+                Text(allocation.destinationType.rawValue.capitalized)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Text("$\(String(format: "%.2f", allocation.amount))")
+                .fontWeight(.medium)
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            }
+            .buttonStyle(BorderlessButtonStyle())
+        }
+    }
+
+    private var destinationName: String {
+        switch allocation.destinationType {
+        case .category:
+            return budgetService.getCategoryById(allocation.destinationId)?.name ?? "Unknown"
+        case .fund:
+            return fundService.getFundById(allocation.destinationId)?.name ?? "Unknown"
+        case .debt:
+            return debtService.getDebtById(allocation.destinationId)?.name ?? "Unknown"
+        }
+    }
+
+    private var destinationIcon: String {
+        switch allocation.destinationType {
+        case .category:
+            return budgetService.getCategoryById(allocation.destinationId)?.icon ?? "questionmark"
+        case .fund:
+            return fundService.getFundById(allocation.destinationId)?.icon ?? "dollarsign.circle"
+        case .debt:
+            return debtService.getDebtById(allocation.destinationId)?.icon ?? "creditcard"
+        }
+    }
+
+    private var destinationColor: Color {
+        switch allocation.destinationType {
+        case .category:
+            return .blue
+        case .fund:
+            return .green
+        case .debt:
+            return .orange
+        }
+    }
+}
+
+// MARK: - Add Allocation View
+
+struct AddAllocationView: View {
+    @Environment(\.dismiss) var dismiss
+
+    let transactionAmount: Double
+    let currentAllocations: [AllocationItem]
+    let isExpense: Bool  // New parameter to determine transaction type
+    let onAdd: (AllocationItem) -> Void
+
+    @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var fundService = FundService.shared
+    @StateObject private var debtService = DebtService.shared
+
+    @State private var selectedType: AllocationType = .category
+    @State private var selectedDestinationId: String = ""
+    @State private var amount: String = ""
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Destination Type")) {
+                    Picker("Type", selection: $selectedType) {
+                        Text("Category").tag(AllocationType.category)
+                        Text("Fund").tag(AllocationType.fund)
+                        Text("Debt").tag(AllocationType.debt)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .onChange(of: selectedType) { _ in
+                        selectedDestinationId = ""
+                    }
+                }
+
+                Section(header: Text("Select \(selectedType.rawValue.capitalized)")) {
+                    ForEach(availableDestinations, id: \.id) { destination in
+                        Button(action: {
+                            selectedDestinationId = destination.id
+                        }) {
+                            HStack {
+                                Image(systemName: destination.icon)
+                                    .foregroundColor(typeColor)
+                                    .frame(width: 30)
+                                Text(destination.name)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedDestinationId == destination.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+                            }
                         }
+                    }
+
+                    if availableDestinations.isEmpty {
+                        Text("No \(selectedType.rawValue)s available")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section(header: Text("Amount")) {
+                    HStack {
+                        Text("$")
+                            .foregroundColor(.secondary)
+                        TextField("0.00", text: $amount)
+                            .keyboardType(.decimalPad)
+                    }
+                }
+
+                if remainingAmount > 0 {
+                    Section {
+                        Text(
+                            "Remaining to allocate: $\(String(format: "%.2f", remainingAmount))"
+                        )
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                }
+
+                if let message = validationMessage {
+                    Section {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.red)
                     }
                 }
             }
+            .navigationTitle("Add Allocation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        addAllocation()
+                    }
+                    .disabled(!isValid)
+                }
+            }
+            .onAppear {
+                // Auto-select first available destination
+                if let first = availableDestinations.first {
+                    selectedDestinationId = first.id
+                }
+
+                // Pre-fill with remaining amount
+                if currentAllocations.isEmpty {
+                    amount = String(format: "%.2f", transactionAmount)
+                }
+            }
         }
-        .navigationTitle("Select Category")
-        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var remainingAmount: Double {
+        let totalAllocated = currentAllocations.reduce(0.0) { $0 + $1.amount }
+        return transactionAmount - totalAllocated
+    }
+
+    private var isValid: Bool {
+        guard !selectedDestinationId.isEmpty,
+            let amountValue = Double(amount),
+            amountValue > 0
+        else {
+            return false
+        }
+
+        // For income transactions to categories, check against category spending
+        if !isExpense && selectedType == .category {
+            let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+            // Can't reimburse more than what was spent
+            return amountValue <= categorySpending
+        }
+
+        return true
+    }
+
+    private var validationMessage: String? {
+        guard !isExpense && selectedType == .category,
+            let amountValue = Double(amount),
+            amountValue > 0,
+            !selectedDestinationId.isEmpty
+        else {
+            return nil
+        }
+
+        let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+        if amountValue > categorySpending {
+            return
+                "Cannot reimburse $\(String(format: "%.2f", amountValue)) to a category with only $\(String(format: "%.2f", categorySpending)) spent"
+        }
+
+        return nil
+    }
+
+    private var typeColor: Color {
+        switch selectedType {
+        case .category: return .blue
+        case .fund: return .green
+        case .debt: return .orange
+        }
+    }
+
+    private var availableDestinations: [(id: String, name: String, icon: String)] {
+        let alreadyAllocatedIds =
+            currentAllocations
+            .filter { $0.destinationType == selectedType }
+            .map { $0.destinationId }
+
+        switch selectedType {
+        case .category:
+            return budgetService.getActiveCategories()
+                .filter { category in
+                    // Basic filters
+                    guard !category.id.isEmpty && !alreadyAllocatedIds.contains(category.id) else {
+                        return false
+                    }
+
+                    // For income transactions, only show categories with spending > 0
+                    if !isExpense {
+                        let spending = budgetService.categorySpending[category.id] ?? 0.0
+                        return spending > 0
+                    }
+
+                    return true
+                }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        case .fund:
+            return fundService.getActiveFunds()
+                .filter { !$0.id.isEmpty && !alreadyAllocatedIds.contains($0.id) }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        case .debt:
+            return debtService.getActiveDebts()
+                .filter { !$0.id.isEmpty && !alreadyAllocatedIds.contains($0.id) }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        }
+    }
+
+    private func addAllocation() {
+        guard let amountValue = Double(amount) else { return }
+
+        let allocation = AllocationItem(
+            destinationType: selectedType,
+            destinationId: selectedDestinationId,
+            amount: amountValue
+        )
+
+        onAdd(allocation)
+        dismiss()
     }
 }
 
@@ -427,16 +716,5 @@ struct CategorySelectionView: View {
 struct ManualEntryView_Previews: PreviewProvider {
     static var previews: some View {
         ManualEntryView()
-
-        ManualEntryView(
-            prefilledAlert: TransactionAlert(
-                id: "test123",
-                emailId: "gmail123",
-                merchant: "Target",
-                date: Date(),
-                amount: 45.99,
-                rawEmailBody: "Test",
-                receivedAt: Date()
-            ))
     }
 }

@@ -386,16 +386,31 @@ class BudgetService: ObservableObject {
         // Reset all spending
         categorySpending.removeAll()
 
-        // Calculate current month spending per category
+        // Get all allocations
+        let allAllocations = AllocationService.shared.allocations
+
+        // Calculate current month spending per category (including both expenses and income)
         let currentMonthTransactions = transactions.filter { transaction in
             let month = calendar.component(.month, from: transaction.date)
             let year = calendar.component(.year, from: transaction.date)
-            return month == currentMonth && year == currentYear && transaction.isExpense
+            return month == currentMonth && year == currentYear
         }
 
         for transaction in currentMonthTransactions {
-            let categoryId = transaction.categoryId
-            categorySpending[categoryId, default: 0] += transaction.amount
+            // Find allocations for this transaction that go to categories
+            let categoryAllocations = allAllocations.filter {
+                $0.transactionId == transaction.id && $0.destinationType == .category
+            }
+
+            for allocation in categoryAllocations {
+                // For expenses: add to spending
+                // For income: subtract from spending (reimbursement)
+                if transaction.isExpense {
+                    categorySpending[allocation.destinationId, default: 0] += allocation.amount
+                } else {
+                    categorySpending[allocation.destinationId, default: 0] -= allocation.amount
+                }
+            }
         }
 
         print("📊 [BudgetService] Category spending updated:")
