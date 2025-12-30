@@ -363,7 +363,8 @@ struct ManualEntryView: View {
                         transactionId: firestoreId,
                         destinationType: allocation.destinationType,
                         destinationId: allocation.destinationId,
-                        amount: allocation.amount
+                        amount: allocation.amount,
+                        isExpense: isExpense
                     )
                 }
 

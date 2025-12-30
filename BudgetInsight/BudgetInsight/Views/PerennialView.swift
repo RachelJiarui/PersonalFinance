@@ -442,7 +442,6 @@ struct AddDebtView: View {
     @State private var name: String = ""
     @State private var description: String = ""
     @State private var icon: String = "creditcard"
-    @State private var balance: String = ""
     @State private var goal: String = ""
     @State private var hasDeadline: Bool = false
     @State private var deadline: Date = Date()
@@ -464,18 +463,11 @@ struct AddDebtView: View {
                     }
                 }
 
-                Section(header: Text("Amount Owed")) {
+                Section(header: Text("Total to Pay Off")) {
                     HStack {
-                        Text("Current Balance $")
+                        Text("$")
                             .foregroundColor(.secondary)
-                        TextField("0.00", text: $balance)
-                            .keyboardType(.decimalPad)
-                    }
-
-                    HStack {
-                        Text("Total to Pay Off $")
-                            .foregroundColor(.secondary)
-                        TextField("0.00", text: $goal)
+                        TextField("500", text: $goal)
                             .keyboardType(.decimalPad)
                     }
                 }
@@ -490,6 +482,14 @@ struct AddDebtView: View {
                             displayedComponents: [.date]
                         )
                     }
+                }
+
+                Section {
+                    Text(
+                        "The debt will start at the total amount and decrease as you allocate income transactions to it."
+                    )
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("Add Debt")
@@ -512,11 +512,11 @@ struct AddDebtView: View {
     }
 
     private var isValid: Bool {
-        !name.isEmpty && Double(balance) != nil && Double(goal) != nil
+        !name.isEmpty && Double(goal) != nil
     }
 
     private func saveDebt() {
-        guard let balanceValue = Double(balance), let goalValue = Double(goal) else {
+        guard let goalValue = Double(goal) else {
             return
         }
 
@@ -526,7 +526,7 @@ struct AddDebtView: View {
             name: name,
             icon: icon,
             description: description,
-            balance: balanceValue,
+            balance: goalValue,  // Start with balance = goal (full debt amount)
             goal: goalValue,
             deadline: deadlineValue
         )

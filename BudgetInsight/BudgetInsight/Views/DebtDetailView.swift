@@ -221,12 +221,13 @@ struct DebtDetailView: View {
 
     private func handleBalanceAllocation(_ allocations: [AllocationItem]) {
         // Create a transaction to represent the debt balance transfer
+        // Debt balance represents money OWED, so paying it off is an expense
         let transaction = Transaction(
             id: "",
             amount: debt.balance,
             date: Date(),
             title: "Transfer from \(debt.name) (Deleted)",
-            isExpense: true,  // It's expense since we're transferring debt
+            isExpense: true,  // Expense - using money from destinations to pay off debt
             timestamp: Date(),
             linkedEmailAlertId: nil
         )
@@ -249,13 +250,14 @@ struct DebtDetailView: View {
                     )
                 )
 
-                // Create allocations
+                // Create allocations - use same isExpense as transaction
                 for allocation in allocations {
                     _ = allocationService.createAllocation(
                         transactionId: firestoreId,
                         destinationType: allocation.destinationType,
                         destinationId: allocation.destinationId,
-                        amount: allocation.amount
+                        amount: allocation.amount,
+                        isExpense: true  // Expense - redistributing debt balance subtracts from destinations
                     )
                 }
 
@@ -352,6 +354,10 @@ struct EditDebtView: View {
                         Text("$\(String(format: "%.2f", debt.balance))")
                             .foregroundColor(.secondary)
                     }
+
+                    Text("Balance decreases as you allocate income transactions to this debt.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("Edit Debt")

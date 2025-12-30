@@ -54,7 +54,8 @@ class AllocationService: ObservableObject {
         transactionId: String,
         destinationType: AllocationType,
         destinationId: String,
-        amount: Double
+        amount: Double,
+        isExpense: Bool? = nil
     ) -> TransactionAllocation {
         // Validate that the destination exists
         let isValid = validateDestination(type: destinationType, id: destinationId)
@@ -93,9 +94,22 @@ class AllocationService: ObservableObject {
             }
         }
 
+        // Determine if transaction is expense or income
+        let transactionIsExpense: Bool
+        if let providedIsExpense = isExpense {
+            transactionIsExpense = providedIsExpense
+        } else {
+            // Fallback: Look up the transaction
+            let transaction = TransactionStorageService.shared.transactions.first {
+                $0.id == transactionId
+            }
+            transactionIsExpense = transaction?.isExpense ?? true
+        }
+
         // Update destination balances based on allocation type
         updateDestinationBalance(
-            destinationType: destinationType, destinationId: destinationId, amount: amount)
+            destinationType: destinationType, destinationId: destinationId, amount: amount,
+            isExpense: transactionIsExpense)
 
         return newAllocation
     }
@@ -117,10 +131,11 @@ class AllocationService: ObservableObject {
             let oldAmount = allocations[index].amount
             let destinationType = allocations[index].destinationType
             let destinationId = allocations[index].destinationId
+            let transactionId = allocations[index].transactionId
 
             allocations[index] = TransactionAllocation(
                 id: allocationId,
-                transactionId: allocations[index].transactionId,
+                transactionId: transactionId,
                 destinationType: destinationType,
                 destinationId: destinationId,
                 amount: amount,
@@ -141,10 +156,17 @@ class AllocationService: ObservableObject {
                 }
             }
 
+            // Get transaction type
+            let transaction = TransactionStorageService.shared.transactions.first {
+                $0.id == transactionId
+            }
+            let isExpense = transaction?.isExpense ?? true
+
             // Adjust destination balance
             let amountDiff = amount - oldAmount
             updateDestinationBalance(
-                destinationType: destinationType, destinationId: destinationId, amount: amountDiff)
+                destinationType: destinationType, destinationId: destinationId, amount: amountDiff,
+                isExpense: isExpense)
         }
     }
 
@@ -152,11 +174,18 @@ class AllocationService: ObservableObject {
         if let index = allocations.firstIndex(where: { $0.id == allocationId }) {
             let allocation = allocations[index]
 
+            // Get transaction type
+            let transaction = TransactionStorageService.shared.transactions.first {
+                $0.id == allocation.transactionId
+            }
+            let isExpense = transaction?.isExpense ?? true
+
             // Reverse the balance change
             updateDestinationBalance(
                 destinationType: allocation.destinationType,
                 destinationId: allocation.destinationId,
-                amount: -allocation.amount
+                amount: -allocation.amount,
+                isExpense: isExpense
             )
 
             allocations.remove(at: index)
@@ -200,7 +229,7 @@ class AllocationService: ObservableObject {
     // MARK: - Balance Updates
 
     private func updateDestinationBalance(
-        destinationType: AllocationType, destinationId: String, amount: Double
+        destinationType: AllocationType, destinationId: String, amount: Double, isExpense: Bool
     ) {
         switch destinationType {
         case .category:
@@ -210,11 +239,15 @@ class AllocationService: ObservableObject {
 
         case .fund:
             // Update fund balance
-            FundService.shared.updateBalance(fundId: destinationId, amount: amount)
+            // Income allocations ADD to fund (saving money), Expense allocations SUBTRACT from fund (spending money)
+            let adjustedAmount = isExpense ? -amount : amount
+            FundService.shared.updateBalance(fundId: destinationId, amount: adjustedAmount)
 
         case .debt:
-            // Update debt balance
-            DebtService.shared.updateBalance(debtId: destinationId, amount: amount)
+            // Update debt balance - debts work in reverse of funds
+            // Income allocations REDUCE debt (subtract), Expense allocations INCREASE debt (add)
+            let adjustedAmount = isExpense ? amount : -amount
+            DebtService.shared.updateBalance(debtId: destinationId, amount: adjustedAmount)
         }
     }
 

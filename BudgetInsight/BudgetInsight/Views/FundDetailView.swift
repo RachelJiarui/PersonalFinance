@@ -219,12 +219,13 @@ struct FundDetailView: View {
 
     private func handleBalanceAllocation(_ allocations: [AllocationItem]) {
         // Create a transaction to represent the fund balance transfer
+        // When moving money from a fund to other destinations, it's income to those destinations
         let transaction = Transaction(
             id: "",
             amount: fund.balance,
             date: Date(),
             title: "Transfer from \(fund.name) (Deleted)",
-            isExpense: false,  // It's income since we're moving money out
+            isExpense: false,  // It's income - money being moved to other destinations
             timestamp: Date(),
             linkedEmailAlertId: nil
         )
@@ -247,13 +248,14 @@ struct FundDetailView: View {
                     )
                 )
 
-                // Create allocations
+                // Create allocations - use same isExpense as transaction
                 for allocation in allocations {
                     _ = allocationService.createAllocation(
                         transactionId: firestoreId,
                         destinationType: allocation.destinationType,
                         destinationId: allocation.destinationId,
-                        amount: allocation.amount
+                        amount: allocation.amount,
+                        isExpense: false  // Income - redistributing fund balance adds to destinations
                     )
                 }
 
