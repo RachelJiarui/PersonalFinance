@@ -6,9 +6,11 @@ struct FundDetailView: View {
     @StateObject private var fundService = FundService.shared
     @StateObject private var allocationService = AllocationService.shared
     @StateObject private var storageService = TransactionStorageService.shared
+    @StateObject private var backendService = BackendService.shared
 
     @State private var showEditFund = false
     @State private var showDeleteConfirmation = false
+    @State private var showAllocateBalance = false
 
     @Environment(\.dismiss) var dismiss
 
@@ -172,15 +174,32 @@ struct FundDetailView: View {
         .sheet(isPresented: $showEditFund) {
             EditFundView(fund: fund)
         }
+        .sheet(isPresented: $showAllocateBalance) {
+            AllocateBalanceView(
+                balanceAmount: fund.balance,
+                balanceType: "Fund",
+                sourceName: fund.name,
+                sourceId: fund.id,
+                onComplete: { allocations in
+                    handleBalanceAllocation(allocations)
+                }
+            )
+        }
         .alert("Delete Fund?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                deleteFund()
+            if fund.balance > 0 {
+                Button("Continue", role: .none) {
+                    showAllocateBalance = true
+                }
+            } else {
+                Button("Delete", role: .destructive) {
+                    deleteFund()
+                }
             }
         } message: {
             if fund.balance > 0 {
                 Text(
-                    "This fund has a balance of $\(String(format: "%.2f", fund.balance)). Deleting it will remove the fund but keep transaction history."
+                    "This fund has a balance of $\(String(format: "%.2f", fund.balance)). You must allocate this money before deleting."
                 )
             } else {
                 Text("Are you sure you want to delete this fund?")
@@ -196,6 +215,57 @@ struct FundDetailView: View {
 
     private func getTransaction(for allocation: TransactionAllocation) -> Transaction? {
         return storageService.transactions.first { $0.id == allocation.transactionId }
+    }
+
+    private func handleBalanceAllocation(_ allocations: [AllocationItem]) {
+        // Create a transaction to represent the fund balance transfer
+        let transaction = Transaction(
+            id: "",
+            amount: fund.balance,
+            date: Date(),
+            title: "Transfer from \(fund.name) (Deleted)",
+            isExpense: false,  // It's income since we're moving money out
+            timestamp: Date(),
+            linkedEmailAlertId: nil
+        )
+
+        // Save transaction to backend
+        Task {
+            do {
+                let firestoreId = try await backendService.createTransaction(transaction)
+
+                // Save locally
+                storageService.saveTransaction(
+                    Transaction(
+                        id: firestoreId,
+                        amount: transaction.amount,
+                        date: transaction.date,
+                        title: transaction.title,
+                        isExpense: transaction.isExpense,
+                        timestamp: transaction.timestamp,
+                        linkedEmailAlertId: nil
+                    )
+                )
+
+                // Create allocations
+                for allocation in allocations {
+                    _ = allocationService.createAllocation(
+                        transactionId: firestoreId,
+                        destinationType: allocation.destinationType,
+                        destinationId: allocation.destinationId,
+                        amount: allocation.amount
+                    )
+                }
+
+                await MainActor.run {
+                    // Now delete the fund
+                    fundService.deleteFund(fundId: fund.id)
+                    dismiss()
+                }
+            } catch {
+                print("❌ [FundDetailView] Error saving allocation transaction: \(error)")
+            }
+        }
     }
 
     private func deleteFund() {
@@ -351,6 +421,392 @@ struct AllocationTransactionRow: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Allocate Balance View
+
+struct AllocateBalanceView: View {
+    @Environment(\.dismiss) var dismiss
+
+    let balanceAmount: Double
+    let balanceType: String  // "Fund" or "Debt"
+    let sourceName: String
+    let sourceId: String  // ID of the fund/debt being deleted
+    let onComplete: ([AllocationItem]) -> Void
+
+    @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var fundService = FundService.shared
+    @StateObject private var debtService = DebtService.shared
+
+    @State private var allocations: [AllocationItem] = []
+    @State private var showAddAllocation: Bool = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Balance to Allocate")) {
+                    HStack {
+                        Text(balanceType)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("$\(String(format: "%.2f", balanceAmount))")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                    }
+                }
+
+                Section(
+                    header: HStack {
+                        Text("Allocations")
+                        Spacer()
+                        Text(allocationStatusText)
+                            .font(.caption)
+                            .foregroundColor(isAllocationValid ? .green : .orange)
+                    }
+                ) {
+                    if allocations.isEmpty {
+                        Text("Add allocations to move this \(balanceType.lowercased())'s balance")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(allocations) { allocation in
+                            AllocationRow(
+                                allocation: allocation,
+                                onDelete: {
+                                    deleteAllocation(allocation)
+                                }
+                            )
+                        }
+                    }
+
+                    Button(action: {
+                        showAddAllocation = true
+                    }) {
+                        Label("Add Allocation", systemImage: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
+
+                Section {
+                    Text(
+                        "You must allocate the entire balance before deleting this \(balanceType.lowercased()). This ensures no money is lost."
+                    )
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+
+                Section {
+                    Button(action: {
+                        completeAllocation()
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("Complete & Delete \(balanceType)")
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                    }
+                    .disabled(!isAllocationValid)
+                }
+            }
+            .navigationTitle("Allocate \(sourceName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddAllocation) {
+                AddAllocationViewExcludingSource(
+                    transactionAmount: balanceAmount,
+                    currentAllocations: allocations,
+                    isExpense: false,  // Balance transfers are income to destinations
+                    excludeType: balanceType == "Fund" ? .fund : .debt,
+                    excludeId: sourceId,
+                    onAdd: { newAllocation in
+                        allocations.append(newAllocation)
+                    }
+                )
+            }
+        }
+    }
+
+    private var isAllocationValid: Bool {
+        guard balanceAmount > 0 else {
+            return true  // No balance, no allocation needed
+        }
+
+        let totalAllocated = allocations.reduce(0.0) { $0 + $1.amount }
+        return abs(totalAllocated - balanceAmount) < 0.01
+    }
+
+    private var allocationStatusText: String {
+        guard balanceAmount > 0 else {
+            return ""
+        }
+
+        let totalAllocated = allocations.reduce(0.0) { $0 + $1.amount }
+        let remaining = balanceAmount - totalAllocated
+
+        if abs(remaining) < 0.01 {
+            return "✓ Fully Allocated"
+        } else if remaining > 0 {
+            return "$\(String(format: "%.2f", remaining)) remaining"
+        } else {
+            return "$\(String(format: "%.2f", abs(remaining))) over"
+        }
+    }
+
+    private func deleteAllocation(_ allocation: AllocationItem) {
+        allocations.removeAll { $0.id == allocation.id }
+    }
+
+    private func completeAllocation() {
+        onComplete(allocations)
+        dismiss()
+    }
+}
+
+// MARK: - Add Allocation View Excluding Source
+
+struct AddAllocationViewExcludingSource: View {
+    @Environment(\.dismiss) var dismiss
+
+    let transactionAmount: Double
+    let currentAllocations: [AllocationItem]
+    let isExpense: Bool
+    let excludeType: AllocationType
+    let excludeId: String
+    let onAdd: (AllocationItem) -> Void
+
+    @StateObject private var budgetService = BudgetService.shared
+    @StateObject private var fundService = FundService.shared
+    @StateObject private var debtService = DebtService.shared
+
+    @State private var selectedType: AllocationType = .category
+    @State private var selectedDestinationId: String = ""
+    @State private var amount: String = ""
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Destination Type")) {
+                    Picker("Type", selection: $selectedType) {
+                        Text("Category").tag(AllocationType.category)
+                        Text("Fund").tag(AllocationType.fund)
+                        Text("Debt").tag(AllocationType.debt)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .onChange(of: selectedType) { _ in
+                        selectedDestinationId = ""
+                    }
+                }
+
+                Section(header: Text("Select \(selectedType.rawValue.capitalized)")) {
+                    ForEach(availableDestinations, id: \.id) { destination in
+                        Button(action: {
+                            selectedDestinationId = destination.id
+                        }) {
+                            HStack {
+                                Image(systemName: destination.icon)
+                                    .foregroundColor(typeColor)
+                                    .frame(width: 30)
+                                Text(destination.name)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedDestinationId == destination.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
+
+                    if availableDestinations.isEmpty {
+                        Text("No \(selectedType.rawValue)s available")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section(header: Text("Amount")) {
+                    HStack {
+                        Text("$")
+                            .foregroundColor(.secondary)
+                        TextField("0.00", text: $amount)
+                            .keyboardType(.decimalPad)
+                    }
+                }
+
+                if remainingAmount > 0 {
+                    Section {
+                        Text(
+                            "Remaining to allocate: $\(String(format: "%.2f", remainingAmount))"
+                        )
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                }
+
+                if let message = validationMessage {
+                    Section {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Add Allocation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        addAllocation()
+                    }
+                    .disabled(!isValid)
+                }
+            }
+            .onAppear {
+                // Auto-select first available destination
+                if let first = availableDestinations.first {
+                    selectedDestinationId = first.id
+                }
+
+                // Pre-fill with remaining amount
+                if currentAllocations.isEmpty {
+                    amount = String(format: "%.2f", transactionAmount)
+                }
+            }
+        }
+    }
+
+    private var remainingAmount: Double {
+        let totalAllocated = currentAllocations.reduce(0.0) { $0 + $1.amount }
+        return transactionAmount - totalAllocated
+    }
+
+    private var isValid: Bool {
+        guard !selectedDestinationId.isEmpty,
+            let amountValue = Double(amount),
+            amountValue > 0
+        else {
+            return false
+        }
+
+        // For income transactions to categories, check against category spending
+        if !isExpense && selectedType == .category {
+            let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+            // Can't reimburse more than what was spent
+            return amountValue <= categorySpending
+        }
+
+        return true
+    }
+
+    private var validationMessage: String? {
+        guard !isExpense && selectedType == .category,
+            let amountValue = Double(amount),
+            amountValue > 0,
+            !selectedDestinationId.isEmpty
+        else {
+            return nil
+        }
+
+        let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+        if amountValue > categorySpending {
+            return
+                "Cannot reimburse $\(String(format: "%.2f", amountValue)) to a category with only $\(String(format: "%.2f", categorySpending)) spent"
+        }
+
+        return nil
+    }
+
+    private var typeColor: Color {
+        switch selectedType {
+        case .category: return .blue
+        case .fund: return .green
+        case .debt: return .orange
+        }
+    }
+
+    private var availableDestinations: [(id: String, name: String, icon: String)] {
+        let alreadyAllocatedIds =
+            currentAllocations
+            .filter { $0.destinationType == selectedType }
+            .map { $0.destinationId }
+
+        switch selectedType {
+        case .category:
+            return budgetService.getActiveCategories()
+                .filter { category in
+                    // Basic filters
+                    guard !category.id.isEmpty && !alreadyAllocatedIds.contains(category.id) else {
+                        return false
+                    }
+
+                    // For income transactions, only show categories with spending > 0
+                    if !isExpense {
+                        let spending = budgetService.categorySpending[category.id] ?? 0.0
+                        return spending > 0
+                    }
+
+                    return true
+                }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        case .fund:
+            return fundService.getActiveFunds()
+                .filter { fund in
+                    // Exclude source fund and already allocated funds
+                    guard !fund.id.isEmpty && !alreadyAllocatedIds.contains(fund.id) else {
+                        return false
+                    }
+
+                    // Exclude the fund being deleted
+                    if excludeType == .fund && fund.id == excludeId {
+                        return false
+                    }
+
+                    return true
+                }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        case .debt:
+            return debtService.getActiveDebts()
+                .filter { debt in
+                    // Exclude source debt and already allocated debts
+                    guard !debt.id.isEmpty && !alreadyAllocatedIds.contains(debt.id) else {
+                        return false
+                    }
+
+                    // Exclude the debt being deleted
+                    if excludeType == .debt && debt.id == excludeId {
+                        return false
+                    }
+
+                    return true
+                }
+                .map { (id: $0.id, name: $0.name, icon: $0.icon) }
+        }
+    }
+
+    private func addAllocation() {
+        guard let amountValue = Double(amount) else { return }
+
+        let allocation = AllocationItem(
+            destinationType: selectedType,
+            destinationId: selectedDestinationId,
+            amount: amountValue
+        )
+
+        onAdd(allocation)
+        dismiss()
     }
 }
 

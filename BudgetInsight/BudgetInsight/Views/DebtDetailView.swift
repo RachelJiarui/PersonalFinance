@@ -6,9 +6,11 @@ struct DebtDetailView: View {
     @StateObject private var debtService = DebtService.shared
     @StateObject private var allocationService = AllocationService.shared
     @StateObject private var storageService = TransactionStorageService.shared
+    @StateObject private var backendService = BackendService.shared
 
     @State private var showEditDebt = false
     @State private var showDeleteConfirmation = false
+    @State private var showAllocateBalance = false
 
     @Environment(\.dismiss) var dismiss
 
@@ -174,15 +176,32 @@ struct DebtDetailView: View {
         .sheet(isPresented: $showEditDebt) {
             EditDebtView(debt: debt)
         }
+        .sheet(isPresented: $showAllocateBalance) {
+            AllocateBalanceView(
+                balanceAmount: debt.balance,
+                balanceType: "Debt",
+                sourceName: debt.name,
+                sourceId: debt.id,
+                onComplete: { allocations in
+                    handleBalanceAllocation(allocations)
+                }
+            )
+        }
         .alert("Delete Debt?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                deleteDebt()
+            if debt.balance > 0 {
+                Button("Continue", role: .none) {
+                    showAllocateBalance = true
+                }
+            } else {
+                Button("Delete", role: .destructive) {
+                    deleteDebt()
+                }
             }
         } message: {
             if debt.balance > 0 {
                 Text(
-                    "This debt still has a balance of $\(String(format: "%.2f", debt.balance)). Consider paying it off first."
+                    "This debt has a balance of $\(String(format: "%.2f", debt.balance)). You must allocate this debt before deleting."
                 )
             } else {
                 Text("Are you sure you want to delete this debt?")
@@ -198,6 +217,57 @@ struct DebtDetailView: View {
 
     private func getTransaction(for allocation: TransactionAllocation) -> Transaction? {
         return storageService.transactions.first { $0.id == allocation.transactionId }
+    }
+
+    private func handleBalanceAllocation(_ allocations: [AllocationItem]) {
+        // Create a transaction to represent the debt balance transfer
+        let transaction = Transaction(
+            id: "",
+            amount: debt.balance,
+            date: Date(),
+            title: "Transfer from \(debt.name) (Deleted)",
+            isExpense: true,  // It's expense since we're transferring debt
+            timestamp: Date(),
+            linkedEmailAlertId: nil
+        )
+
+        // Save transaction to backend
+        Task {
+            do {
+                let firestoreId = try await backendService.createTransaction(transaction)
+
+                // Save locally
+                storageService.saveTransaction(
+                    Transaction(
+                        id: firestoreId,
+                        amount: transaction.amount,
+                        date: transaction.date,
+                        title: transaction.title,
+                        isExpense: transaction.isExpense,
+                        timestamp: transaction.timestamp,
+                        linkedEmailAlertId: nil
+                    )
+                )
+
+                // Create allocations
+                for allocation in allocations {
+                    _ = allocationService.createAllocation(
+                        transactionId: firestoreId,
+                        destinationType: allocation.destinationType,
+                        destinationId: allocation.destinationId,
+                        amount: allocation.amount
+                    )
+                }
+
+                await MainActor.run {
+                    // Now delete the debt
+                    debtService.deleteDebt(debtId: debt.id)
+                    dismiss()
+                }
+            } catch {
+                print("❌ [DebtDetailView] Error saving allocation transaction: \(error)")
+            }
+        }
     }
 
     private func deleteDebt() {
