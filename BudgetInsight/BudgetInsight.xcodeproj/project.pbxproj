@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0086C9BFDE043BD5E65AED6C /* TransactionAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */; };
+		0BB1920308E41E8F573918BD /* Debt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 049950824A4A647CD9DCBF71 /* Debt.swift */; };
 		1A000030 /* BudgetInsightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000002 /* BudgetInsightApp.swift */; };
 		1A000031 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000004 /* ContentView.swift */; };
 		1A000032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A000006 /* Assets.xcassets */; };
@@ -22,6 +24,14 @@
 		1A000040 /* ManualEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000048 /* ManualEntryView.swift */; };
 		1A000041 /* NeedsEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000049 /* NeedsEntryView.swift */; };
 		1A00004A /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000043 /* EmailService.swift */; };
+		1CD1A1B56AA728C87AFB942E /* DebtService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DBF7F264C2F518E52B125 /* DebtService.swift */; };
+		22FAC9F59FEC92C48CD8FB82 /* AllocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */; };
+		27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3677BCF0A539CB986B5C63FD /* Fund.swift */; };
+		4731ECEAC2C7CCF59B3E2F1A /* FundDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */; };
+		4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE3D54C69884491F123DF6B /* DebtDetailView.swift */; };
+		879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E0DAAE7F3A4695195AF185 /* PerennialView.swift */; };
+		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
+		CC762D2D2F0383EE00DB650A /* EditTransactionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */; };
 		CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192182EFF46B90053873B /* PeriodSnapshot.swift */; };
 		CCF1921B2EFF46B90053873B /* UserIncome.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192192EFF46B90053873B /* UserIncome.swift */; };
 		CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
@@ -38,19 +48,11 @@
 		CCF192332EFF47050053873B /* SnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192312EFF47050053873B /* SnapshotService.swift */; };
 		CCF192342EFF47050053873B /* TaxService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192322EFF47050053873B /* TaxService.swift */; };
 		CCF192352EFF47060053873B /* BackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192362EFF47060053873B /* BackendService.swift */; };
-		27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3677BCF0A539CB986B5C63FD /* Fund.swift */; };
-		0BB1920308E41E8F573918BD /* Debt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 049950824A4A647CD9DCBF71 /* Debt.swift */; };
-		0086C9BFDE043BD5E65AED6C /* TransactionAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */; };
 		CF8860D17823D2D67FC6BE07 /* FundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA4D4D040B401A2E2324017C /* FundService.swift */; };
-		1CD1A1B56AA728C87AFB942E /* DebtService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DBF7F264C2F518E52B125 /* DebtService.swift */; };
-		22FAC9F59FEC92C48CD8FB82 /* AllocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */; };
-		879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E0DAAE7F3A4695195AF185 /* PerennialView.swift */; };
-		4731ECEAC2C7CCF59B3E2F1A /* FundDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */; };
-		4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE3D54C69884491F123DF6B /* DebtDetailView.swift */; };
-		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		049950824A4A647CD9DCBF71 /* Debt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debt.swift; sourceTree = "<group>"; };
 		1A000001 /* BudgetInsight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetInsight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A000002 /* BudgetInsightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetInsightApp.swift; sourceTree = "<group>"; };
 		1A000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -67,10 +69,17 @@
 		1A000045 /* EmailSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSetupView.swift; sourceTree = "<group>"; };
 		1A000048 /* ManualEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualEntryView.swift; sourceTree = "<group>"; };
 		1A000049 /* NeedsEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsEntryView.swift; sourceTree = "<group>"; };
+		3677BCF0A539CB986B5C63FD /* Fund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fund.swift; sourceTree = "<group>"; };
+		73E0DAAE7F3A4695195AF185 /* PerennialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerennialView.swift; sourceTree = "<group>"; };
+		92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationService.swift; sourceTree = "<group>"; };
+		A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundDetailView.swift; sourceTree = "<group>"; };
+		ABE3D54C69884491F123DF6B /* DebtDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtDetailView.swift; sourceTree = "<group>"; };
+		BA4D4D040B401A2E2324017C /* FundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundService.swift; sourceTree = "<group>"; };
+		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
+		CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTransactionView.swift; sourceTree = "<group>"; };
 		CCF192172EFF46B90053873B /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
 		CCF192182EFF46B90053873B /* PeriodSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodSnapshot.swift; sourceTree = "<group>"; };
 		CCF192192EFF46B90053873B /* UserIncome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIncome.swift; sourceTree = "<group>"; };
-		CCF192372EFFNEW1 /* BudgetPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetPlan.swift; sourceTree = "<group>"; };
 		CCF1921E2EFF46E10053873B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularProgressRing.swift; sourceTree = "<group>"; };
 		CCF192202EFF46E10053873B /* DashboardCategoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCategoryCard.swift; sourceTree = "<group>"; };
@@ -83,16 +92,9 @@
 		CCF192312EFF47050053873B /* SnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotService.swift; sourceTree = "<group>"; };
 		CCF192322EFF47050053873B /* TaxService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxService.swift; sourceTree = "<group>"; };
 		CCF192362EFF47060053873B /* BackendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendService.swift; sourceTree = "<group>"; };
-		3677BCF0A539CB986B5C63FD /* Fund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fund.swift; sourceTree = "<group>"; };
-		049950824A4A647CD9DCBF71 /* Debt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debt.swift; sourceTree = "<group>"; };
+		CCF192372EFFNEW1 /* BudgetPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetPlan.swift; sourceTree = "<group>"; };
 		D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAllocation.swift; sourceTree = "<group>"; };
-		BA4D4D040B401A2E2324017C /* FundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundService.swift; sourceTree = "<group>"; };
 		DF9DBF7F264C2F518E52B125 /* DebtService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtService.swift; sourceTree = "<group>"; };
-		92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationService.swift; sourceTree = "<group>"; };
-		73E0DAAE7F3A4695195AF185 /* PerennialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerennialView.swift; sourceTree = "<group>"; };
-		A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundDetailView.swift; sourceTree = "<group>"; };
-		ABE3D54C69884491F123DF6B /* DebtDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtDetailView.swift; sourceTree = "<group>"; };
-		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -146,6 +148,7 @@
 		1A00001E /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */,
 				CCF192222EFF46E10053873B /* Components */,
 				CCF192232EFF46E10053873B /* GrandSchemeView.swift */,
 				CCF192242EFF46E10053873B /* MainTabView.swift */,
@@ -288,6 +291,7 @@
 				CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */,
 				CCF1921B2EFF46B90053873B /* UserIncome.swift in Sources */,
 				CCF192332EFF47050053873B /* SnapshotService.swift in Sources */,
+				CC762D2D2F0383EE00DB650A /* EditTransactionView.swift in Sources */,
 				CCF192342EFF47050053873B /* TaxService.swift in Sources */,
 				CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */,
 				CCF1921E2EFFNEW1 /* BudgetPlan.swift in Sources */,

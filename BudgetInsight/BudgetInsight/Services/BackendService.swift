@@ -146,6 +146,22 @@ class BackendService: ObservableObject {
         return id
     }
 
+    func updateTransaction(transactionId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
     func deleteTransaction(_ transactionId: String) async throws {
         let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
         var request = URLRequest(url: url)

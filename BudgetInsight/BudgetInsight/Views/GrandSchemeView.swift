@@ -47,6 +47,7 @@ struct GrandSchemeView: View {
             }
         }
         .navigationTitle("Grand Scheme")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -332,6 +333,7 @@ struct TransactionDetailView: View {
 
     @StateObject private var fundService = FundService.shared
     @StateObject private var debtService = DebtService.shared
+    @State private var showEditSheet: Bool = false
 
     var allocations: [TransactionAllocation] {
         allocationService.allocations.filter { $0.transactionId == transaction.id }
@@ -408,6 +410,21 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showEditSheet = true
+                }) {
+                    Text("Edit")
+                }
+            }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditTransactionView(
+                originalTransaction: transaction,
+                originalAllocations: allocations
+            )
+        }
     }
 }
 
