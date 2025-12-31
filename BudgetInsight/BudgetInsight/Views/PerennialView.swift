@@ -8,113 +8,111 @@ struct PerennialView: View {
     @State private var showAddDebt = false
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // MARK: - Funds Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Funds", systemImage: "banknote")
+        ScrollView {
+            VStack(spacing: 20) {
+                // MARK: - Funds Section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("Funds", systemImage: "banknote")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Spacer()
+                        Button(action: {
+                            showAddFund = true
+                        }) {
+                            Image(systemName: "plus.circle.fill")
                                 .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Button(action: {
-                                showAddFund = true
-                            }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.green)
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        if fundService.getActiveFunds().isEmpty {
-                            EmptyStateView(
-                                icon: "dollarsign.circle",
-                                title: "No Funds Yet",
-                                description: "Create funds to save for larger purchases or goals",
-                                actionText: "Add Fund",
-                                action: {
-                                    showAddFund = true
-                                }
-                            )
-                        } else {
-                            ForEach(fundService.getActiveFunds()) { fund in
-                                NavigationLink(destination: FundDetailView(fund: fund)) {
-                                    FundCard(fund: fund)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
+                                .foregroundColor(.green)
                         }
                     }
+                    .padding(.horizontal)
 
-                    Divider()
-                        .padding(.vertical)
-
-                    // MARK: - Debts Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Debts", systemImage: "creditcard")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Button(action: {
-                                showAddDebt = true
-                            }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        if debtService.getActiveDebts().isEmpty {
-                            EmptyStateView(
-                                icon: "creditcard",
-                                title: "No Debts",
-                                description:
-                                    "Debts are created when you overspend and need to pay back later",
-                                actionText: "Add Debt",
-                                action: {
-                                    showAddDebt = true
-                                }
-                            )
-                        } else {
-                            ForEach(debtService.getActiveDebts()) { debt in
-                                NavigationLink(destination: DebtDetailView(debt: debt)) {
-                                    DebtCard(debt: debt)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical)
-            }
-            .navigationTitle("Perennial")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(
-                            role: .destructive,
+                    if fundService.getActiveFunds().isEmpty {
+                        EmptyStateView(
+                            icon: "dollarsign.circle",
+                            title: "No Funds Yet",
+                            description: "Create funds to save for larger purchases or goals",
+                            actionText: "Add Fund",
                             action: {
-                                clearAllLocalData()
+                                showAddFund = true
                             }
-                        ) {
-                            Label("Clear All Local Data", systemImage: "trash")
+                        )
+                    } else {
+                        ForEach(fundService.getActiveFunds()) { fund in
+                            NavigationLink(destination: FundDetailView(fund: fund)) {
+                                FundCard(fund: fund)
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+
+                Divider()
+                    .padding(.vertical)
+
+                // MARK: - Debts Section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("Debts", systemImage: "creditcard")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Spacer()
+                        Button(action: {
+                            showAddDebt = true
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    if debtService.getActiveDebts().isEmpty {
+                        EmptyStateView(
+                            icon: "creditcard",
+                            title: "No Debts",
+                            description:
+                                "Debts are created when you overspend and need to pay back later",
+                            actionText: "Add Debt",
+                            action: {
+                                showAddDebt = true
+                            }
+                        )
+                    } else {
+                        ForEach(debtService.getActiveDebts()) { debt in
+                            NavigationLink(destination: DebtDetailView(debt: debt)) {
+                                DebtCard(debt: debt)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
                 }
             }
-            .sheet(isPresented: $showAddFund) {
-                AddFundView()
+            .padding(.vertical)
+        }
+        .navigationTitle("Perennial")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(
+                        role: .destructive,
+                        action: {
+                            clearAllLocalData()
+                        }
+                    ) {
+                        Label("Clear All Local Data", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
-            .sheet(isPresented: $showAddDebt) {
-                AddDebtView()
-            }
+        }
+        .sheet(isPresented: $showAddFund) {
+            AddFundView()
+        }
+        .sheet(isPresented: $showAddDebt) {
+            AddDebtView()
         }
     }
 
