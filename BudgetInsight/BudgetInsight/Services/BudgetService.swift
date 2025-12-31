@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 class BudgetService: ObservableObject {
@@ -15,16 +16,56 @@ class BudgetService: ObservableObject {
     private let budgetPlanKey = "budget_plan"
     private let categoriesKey = "budget_categories"
     private let incomeKey = "user_income"
+    private var cancellables = Set<AnyCancellable>()
 
     private init() {
         loadUserIncome()
         loadBudgetCategories()
         loadBudgetPlan()
 
+        // Subscribe to allocation changes to automatically recalculate spending
+        setupAllocationSubscription()
+
         // Fetch data from Firestore on initialization
         Task {
             await fetchDataFromFirestore()
         }
+    }
+
+    // MARK: - Reactive Subscriptions
+
+    private func setupAllocationSubscription() {
+        // Automatically recalculate category spending whenever allocations change
+        AllocationService.shared.$allocations
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                let transactions = TransactionStorageService.shared.transactions
+                print("🔔 [BudgetService] Allocations changed, recalculating category spending...")
+                self.updateCategorySpending(with: transactions)
+            }
+            .store(in: &cancellables)
+
+        // Also recalculate when transactions are loaded/updated
+        TransactionStorageService.shared.$transactions
+            .sink { [weak self] transactions in
+                guard let self = self else { return }
+                print("🔔 [BudgetService] Transactions changed, recalculating category spending...")
+                self.updateCategorySpending(with: transactions)
+            }
+            .store(in: &cancellables)
+
+        // CRITICAL: Also recalculate when budget categories are loaded
+        // This ensures spending displays correctly when categories load from Firestore
+        $budgetCategories
+            .sink { [weak self] categories in
+                guard let self = self else { return }
+                let transactions = TransactionStorageService.shared.transactions
+                print(
+                    "🔔 [BudgetService] Budget categories changed (\(categories.count) categories), recalculating category spending..."
+                )
+                self.updateCategorySpending(with: transactions)
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Firestore Data Fetching
@@ -59,11 +100,23 @@ class BudgetService: ObservableObject {
             }
 
             // Fetch budget categories
-            let categories = try await BackendService.shared.fetchBudgetCategories()
-            print("✅ [BudgetService] Fetched \(categories.count) categories from Firestore")
+            let firestoreCategories = try await BackendService.shared.fetchBudgetCategories()
+            print(
+                "✅ [BudgetService] Fetched \(firestoreCategories.count) categories from Firestore")
             await MainActor.run {
-                self.budgetCategories = categories
+                // Use Firestore as source of truth BUT preserve any local categories
+                // that might not be synced yet (with empty IDs)
+                let localOnlyCategories = self.budgetCategories.filter { $0.id.isEmpty }
+
+                print("📊 [BudgetService] Merging categories:")
+                print("   - Firestore categories: \(firestoreCategories.count)")
+                print("   - Local-only categories (not synced): \(localOnlyCategories.count)")
+
+                // Use Firestore categories + any unsynced local ones
+                self.budgetCategories = firestoreCategories + localOnlyCategories
                 self.saveBudgetCategories()
+
+                print("   - Total after merge: \(self.budgetCategories.count)")
             }
         } catch {
             print("❌ [BudgetService] Error fetching data from Firestore: \(error)")
@@ -378,16 +431,25 @@ class BudgetService: ObservableObject {
             "\n💰 [BudgetService] Updating category spending with \(transactions.count) transactions..."
         )
 
+        print("📋 [BudgetService] Currently loaded categories: \(budgetCategories.count)")
+        for category in budgetCategories {
+            print("   - \(category.name) (ID: \(category.id), Active: \(category.isActive))")
+        }
+
         let calendar = Calendar.current
         let now = Date()
         let currentMonth = calendar.component(.month, from: now)
         let currentYear = calendar.component(.year, from: now)
+
+        print("📅 [BudgetService] Current date: \(now)")
+        print("📅 [BudgetService] Filtering for month: \(currentMonth), year: \(currentYear)")
 
         // Reset all spending
         categorySpending.removeAll()
 
         // Get all allocations
         let allAllocations = AllocationService.shared.allocations
+        print("🔗 [BudgetService] Found \(allAllocations.count) total allocations")
 
         // Calculate current month spending per category (including both expenses and income)
         let currentMonthTransactions = transactions.filter { transaction in
@@ -396,19 +458,41 @@ class BudgetService: ObservableObject {
             return month == currentMonth && year == currentYear
         }
 
+        print(
+            "📅 [BudgetService] Found \(currentMonthTransactions.count) transactions in current month"
+        )
+
         for transaction in currentMonthTransactions {
             // Find allocations for this transaction that go to categories
             let categoryAllocations = allAllocations.filter {
                 $0.transactionId == transaction.id && $0.destinationType == .category
             }
 
+            print(
+                "   Transaction '\(transaction.title)': \(categoryAllocations.count) category allocations"
+            )
+
             for allocation in categoryAllocations {
+                let categoryName =
+                    getCategoryById(allocation.destinationId)?.name
+                    ?? "Unknown(\(allocation.destinationId))"
+
                 // For expenses: add to spending
                 // For income: subtract from spending (reimbursement)
                 if transaction.isExpense {
+                    let before = categorySpending[allocation.destinationId, default: 0]
                     categorySpending[allocation.destinationId, default: 0] += allocation.amount
+                    let after = categorySpending[allocation.destinationId, default: 0]
+                    print(
+                        "      ➕ Adding $\(allocation.amount) to '\(categoryName)': $\(before) → $\(after)"
+                    )
                 } else {
+                    let before = categorySpending[allocation.destinationId, default: 0]
                     categorySpending[allocation.destinationId, default: 0] -= allocation.amount
+                    let after = categorySpending[allocation.destinationId, default: 0]
+                    print(
+                        "      ➖ Subtracting $\(allocation.amount) from '\(categoryName)': $\(before) → $\(after)"
+                    )
                 }
             }
         }
@@ -418,6 +502,9 @@ class BudgetService: ObservableObject {
             if let category = getCategoryById(categoryId) {
                 print("   \(category.name): $\(String(format: "%.2f", amount))")
             }
+        }
+        if categorySpending.isEmpty {
+            print("   ⚠️ No category spending calculated!")
         }
         print("✅ [BudgetService] Category spending update complete\n")
     }
@@ -485,6 +572,14 @@ class BudgetService: ObservableObject {
             let decoded = try? JSONDecoder().decode([BudgetCategory].self, from: data)
         {
             budgetCategories = decoded
+            print(
+                "💾 [BudgetService] Loaded \(budgetCategories.count) budget categories from local storage"
+            )
+            for category in budgetCategories {
+                print("   - \(category.name) (ID: \(category.id), Active: \(category.isActive))")
+            }
+        } else {
+            print("⚠️ [BudgetService] No budget categories found in local storage")
         }
         // No default categories - user creates their own in Budget Plan
     }

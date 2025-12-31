@@ -282,6 +282,10 @@ class AllocationService: ObservableObject {
             let decoded = try? JSONDecoder().decode([TransactionAllocation].self, from: data)
         {
             allocations = decoded
+            print(
+                "💾 [AllocationService] Loaded \(allocations.count) allocations from local storage")
+        } else {
+            print("⚠️ [AllocationService] No allocations found in local storage")
         }
     }
 }

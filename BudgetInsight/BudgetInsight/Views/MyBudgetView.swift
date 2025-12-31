@@ -124,20 +124,23 @@ struct MyBudgetView: View {
                             }
                         }
                 ) {
-                    ForEach(categories) { category in
+                    ForEach(Array(categories.enumerated()), id: \.offset) { index, category in
                         if isEditing {
                             CategoryAllocationRow(
                                 category: category,
                                 monthlyTakeHome: income.monthlyTakeHome,
                                 isEditing: true,
                                 onUpdate: { newPercentage in
-                                    if let index = editCategories.firstIndex(where: {
+                                    if let idx = editCategories.firstIndex(where: {
                                         $0.id == category.id
+                                            || ($0.id.isEmpty && $0.name == category.name
+                                                && $0.icon == category.icon)
                                     }) {
-                                        editCategories[index].percentage = newPercentage
+                                        editCategories[idx].percentage = newPercentage
                                     }
                                 }
                             )
+                            .id("\(index)-\(category.id)-\(category.name)-\(category.icon)")
                         } else {
                             CategoryAllocationRow(
                                 category: category,
@@ -257,21 +260,34 @@ struct MyBudgetView: View {
         viewModel.contribution401kInput = editContribution401k
         viewModel.updateIncome()
 
-        // Save category changes
-        // First, mark all current categories as inactive
-        for category in viewModel.budgetCategories {
-            if category.isActive {
-                viewModel.deleteCategory(categoryId: category.id)
+        // Save category changes intelligently
+        let originalCategories = viewModel.budgetCategories.filter { $0.isActive }
+
+        // 1. Find categories that were deleted (in original but not in edited)
+        for originalCategory in originalCategories {
+            if !editCategories.contains(where: { $0.id == originalCategory.id }) {
+                viewModel.deleteCategory(categoryId: originalCategory.id)
             }
         }
 
-        // Then add all edited categories
-        for category in editCategories {
-            viewModel.addCategory(
-                name: category.name,
-                percentage: category.percentage,
-                icon: category.icon
-            )
+        // 2. Update or create categories
+        for editedCategory in editCategories {
+            if editedCategory.id.isEmpty {
+                // New category - create it
+                viewModel.addCategory(
+                    name: editedCategory.name,
+                    percentage: editedCategory.percentage,
+                    icon: editedCategory.icon
+                )
+            } else {
+                // Existing category - update it
+                viewModel.updateCategory(
+                    categoryId: editedCategory.id,
+                    name: editedCategory.name,
+                    percentage: editedCategory.percentage,
+                    icon: editedCategory.icon
+                )
+            }
         }
 
         isEditing = false
@@ -434,6 +450,12 @@ struct AddCategorySheet: View {
             }
             .navigationTitle("Add Category")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Reset all fields when sheet appears
+                name = ""
+                percentage = ""
+                selectedIcon = "dollarsign.circle"
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {

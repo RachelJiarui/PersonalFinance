@@ -29,13 +29,29 @@ class TransactionStorageService: ObservableObject {
     func loadTransactions() {
         guard let data = UserDefaults.standard.data(forKey: transactionsKey) else {
             transactions = []
+            print("⚠️ [TransactionStorageService] No transactions found in local storage")
             return
         }
 
         do {
             transactions = try JSONDecoder().decode([Transaction].self, from: data)
+            print(
+                "💾 [TransactionStorageService] Loaded \(transactions.count) transactions from local storage"
+            )
+
+            // Debug: Show date range of transactions
+            if !transactions.isEmpty {
+                let dates = transactions.map { $0.date }
+                if let minDate = dates.min(), let maxDate = dates.max() {
+                    let formatter = DateFormatter()
+                    formatter.dateStyle = .short
+                    print(
+                        "   Date range: \(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))"
+                    )
+                }
+            }
         } catch {
-            print("Failed to decode transactions: \(error)")
+            print("❌ [TransactionStorageService] Failed to decode transactions: \(error)")
             transactions = []
         }
 
