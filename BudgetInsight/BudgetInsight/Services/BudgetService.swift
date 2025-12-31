@@ -104,19 +104,13 @@ class BudgetService: ObservableObject {
             print(
                 "✅ [BudgetService] Fetched \(firestoreCategories.count) categories from Firestore")
             await MainActor.run {
-                // Use Firestore as source of truth BUT preserve any local categories
-                // that might not be synced yet (with empty IDs)
-                let localOnlyCategories = self.budgetCategories.filter { $0.id.isEmpty }
-
-                print("📊 [BudgetService] Merging categories:")
-                print("   - Firestore categories: \(firestoreCategories.count)")
-                print("   - Local-only categories (not synced): \(localOnlyCategories.count)")
-
-                // Use Firestore categories + any unsynced local ones
-                self.budgetCategories = firestoreCategories + localOnlyCategories
+                // Firestore is the source of truth - replace local data entirely
+                self.budgetCategories = firestoreCategories
                 self.saveBudgetCategories()
 
-                print("   - Total after merge: \(self.budgetCategories.count)")
+                print(
+                    "📊 [BudgetService] Replaced local categories with Firestore data (\(firestoreCategories.count) categories)"
+                )
             }
         } catch {
             print("❌ [BudgetService] Error fetching data from Firestore: \(error)")
