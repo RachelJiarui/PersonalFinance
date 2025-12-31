@@ -228,8 +228,7 @@ struct DebtDetailView: View {
             date: Date(),
             title: "Transfer from \(debt.name) (Deleted)",
             isExpense: true,  // Expense - using money from destinations to pay off debt
-            timestamp: Date(),
-            linkedEmailAlertId: nil
+            timestamp: Date()
         )
 
         // Save transaction to backend
@@ -245,8 +244,7 @@ struct DebtDetailView: View {
                         date: transaction.date,
                         title: transaction.title,
                         isExpense: transaction.isExpense,
-                        timestamp: transaction.timestamp,
-                        linkedEmailAlertId: nil
+                        timestamp: transaction.timestamp
                     )
                 )
 

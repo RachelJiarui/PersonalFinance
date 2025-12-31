@@ -4,22 +4,12 @@ struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var showManualEntry = false
-    @State private var showNeedsEntry = false
     @State private var dashboardTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 24) {
-                    HeaderView()
-
-                    // MARK: - Needs Entry Section
-                    if viewModel.unlinkedAlertsCount > 0 {
-                        NeedsEntryBanner(count: viewModel.unlinkedAlertsCount) {
-                            showNeedsEntry = true
-                        }
-                    }
-
                     // Always show content, never show loading spinner
                     if let income = BudgetService.shared.userIncome,
                         !BudgetService.shared.getActiveCategories().isEmpty
@@ -56,6 +46,7 @@ struct DashboardView: View {
             }
             .padding()
         }
+        .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -67,17 +58,6 @@ struct DashboardView: View {
                         }
                     }) {
                         Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-
-                    Button(action: {
-                        dashboardTask?.cancel()
-                        dashboardTask = Task {
-                            await viewModel.fetchOneEmailAlert()
-                        }
-                    }) {
-                        Label(
-                            "Fetch Email Alert (Test)",
-                            systemImage: "envelope.arrow.triangle.branch")
                     }
 
                     Button(
@@ -119,57 +99,12 @@ struct DashboardView: View {
         .sheet(isPresented: $showManualEntry) {
             ManualEntryView()
         }
-        .sheet(isPresented: $showNeedsEntry) {
-            NeedsEntryView()
-        }
-    }
-}
-
-struct NeedsEntryBanner: View {
-    let count: Int
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "envelope.badge.fill")
-                    .font(.title2)
-                    .foregroundColor(.orange)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Needs Entry")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    Text("\(count) transaction alert\(count == 1 ? "" : "s") waiting")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
     }
 }
 
 struct HeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Dashboard")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
             Text(Date().formatted(date: .abbreviated, time: .omitted))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -185,10 +120,6 @@ struct BudgetRingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Budget Categories")
-                .font(.title2)
-                .fontWeight(.bold)
-
             LazyVGrid(
                 columns: [
                     GridItem(.flexible()),

@@ -21,23 +21,15 @@ struct ManualEntryView: View {
     @State private var title: String = ""
     @State private var date: Date = Date()
     @State private var isExpense: Bool = true
-    @State private var selectedAlertId: String? = nil
 
     // Allocation management
     @State private var allocations: [AllocationItem] = []
     @State private var showAddAllocation: Bool = false
 
-    // Matching
-    @State private var matchingAlerts: [TransactionAlert] = []
-    @State private var availableAlerts: [TransactionAlert] = []
-
     // UI state
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var isSaving: Bool = false
-
-    // Pre-fill from alert (optional)
-    var prefilledAlert: TransactionAlert?
 
     var body: some View {
         NavigationView {
@@ -59,7 +51,6 @@ struct ManualEntryView: View {
                                 } else {
                                     amount = filtered
                                 }
-                                updateMatchingAlerts()
                             }
                     }
 
@@ -73,9 +64,6 @@ struct ManualEntryView: View {
                         selection: $date,
                         displayedComponents: [.date]
                     )
-                    .onChange(of: date) { _ in
-                        updateMatchingAlerts()
-                    }
                 }
 
                 // MARK: - Transaction Type (Checkbox style)
@@ -123,56 +111,6 @@ struct ManualEntryView: View {
                         showAddAllocation = true
                     }) {
                         Label("Add Allocation", systemImage: "plus.circle.fill")
-                            .foregroundColor(.blue)
-                    }
-                }
-
-                // MARK: - Link to Transaction Alert (Optional)
-                Section(header: Text("Link to Email Alert (Optional)")) {
-                    Picker("Transaction Alert", selection: $selectedAlertId) {
-                        Text("None").tag(nil as String?)
-
-                        if !matchingAlerts.isEmpty {
-                            Text("── Matching Alerts ──").tag(nil as String?)
-                            ForEach(matchingAlerts) { alert in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(alert.merchant)
-                                        Text(
-                                            "$\(String(format: "%.2f", alert.amount)) • \(formattedDate(alert.date))"
-                                        )
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                }
-                                .tag(alert.id as String?)
-                            }
-                        }
-
-                        if !availableAlerts.isEmpty {
-                            Text("── All Unresolved Alerts ──").tag(nil as String?)
-                            ForEach(availableAlerts) { alert in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(alert.merchant)
-                                        Text(
-                                            "$\(String(format: "%.2f", alert.amount)) • \(formattedDate(alert.date))"
-                                        )
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    }
-                                }
-                                .tag(alert.id as String?)
-                            }
-                        }
-                    }
-
-                    if !matchingAlerts.isEmpty {
-                        Text("💡 \(matchingAlerts.count) alert(s) match this amount and date")
-                            .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
@@ -267,18 +205,6 @@ struct ManualEntryView: View {
     // MARK: - Methods
 
     private func loadData() {
-        // Load all unresolved alerts
-        availableAlerts = storageService.getUnlinkedAlerts()
-
-        // Pre-fill if alert was provided
-        if let alert = prefilledAlert {
-            amount = String(format: "%.2f", alert.amount)
-            title = alert.merchant
-            date = alert.date
-            selectedAlertId = alert.id
-            updateMatchingAlerts()
-        }
-
         // Create default allocation if amount is set
         if !amount.isEmpty, let amountValue = Double(amount), allocations.isEmpty {
             // Default to first active category if available
@@ -290,24 +216,6 @@ struct ManualEntryView: View {
                         amount: amountValue
                     )
                 )
-            }
-        }
-    }
-
-    private func updateMatchingAlerts() {
-        guard let amountValue = Double(amount) else {
-            matchingAlerts = []
-            return
-        }
-
-        matchingAlerts = storageService.findMatchingAlerts(amount: amountValue, date: date)
-
-        // Auto-select if only one match and none selected
-        if matchingAlerts.count == 1, selectedAlertId == nil {
-            selectedAlertId = matchingAlerts.first?.id
-            // Pre-fill title from alert if empty
-            if title.isEmpty, let alert = matchingAlerts.first {
-                title = alert.merchant
             }
         }
     }
@@ -341,8 +249,7 @@ struct ManualEntryView: View {
             date: date,
             title: title,
             isExpense: isExpense,
-            timestamp: Date(),
-            linkedEmailAlertId: selectedAlertId
+            timestamp: Date()
         )
 
         // Save to backend first
@@ -366,24 +273,6 @@ struct ManualEntryView: View {
                         amount: allocation.amount,
                         isExpense: isExpense
                     )
-                }
-
-                // If linked to alert, update alert to link back to transaction
-                if let alertId = selectedAlertId {
-                    storageService.linkAlert(id: alertId, toTransactionId: firestoreId)
-
-                    // Try to update backend link
-                    do {
-                        try await backendService.linkTransactionToAlert(
-                            transactionId: firestoreId,
-                            alertId: alertId
-                        )
-                        print("✅ [ManualEntry] Linked transaction to alert in Firestore")
-                    } catch {
-                        print(
-                            "⚠️ [ManualEntry] Could not link alert in Firestore: \(error)"
-                        )
-                    }
                 }
 
                 // Update category spending (instant UI update)
@@ -418,12 +307,6 @@ struct ManualEntryView: View {
     private func showErrorAlert(_ message: String) {
         errorMessage = message
         showError = true
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        return formatter.string(from: date)
     }
 }
 

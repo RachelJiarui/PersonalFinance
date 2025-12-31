@@ -134,15 +134,6 @@ class BudgetViewModel: ObservableObject {
         return budgetService.getActiveCategories()
     }
 
-    // MARK: - Data Management
-
-    func clearAllData() {
-        budgetService.clearAllData()
-        annualSalaryInput = ""
-        contribution401kInput = ""
-        validationError = nil
-    }
-
     // MARK: - Validation
 
     func validateAllocation() {

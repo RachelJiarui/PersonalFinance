@@ -3,7 +3,6 @@ import SwiftUI
 struct MyBudgetView: View {
     @EnvironmentObject var viewModel: BudgetViewModel
     @State private var showAddCategory = false
-    @State private var showClearDataAlert = false
     @State private var showTaxBreakdown = false
     @State private var isEditing = false
 
@@ -185,21 +184,9 @@ struct MyBudgetView: View {
                     }
                 }
             }
-
-            // MARK: - Debug/Reset Section
-            Section(header: Text("Reset")) {
-                Button(
-                    role: .destructive,
-                    action: {
-                        showClearDataAlert = true
-                    }
-                ) {
-                    Label("Clear All Budget Data", systemImage: "trash")
-                        .foregroundColor(.red)
-                }
-            }
         }
         .navigationTitle("My Budget")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -230,16 +217,6 @@ struct MyBudgetView: View {
                 onAdd: { category in
                     editCategories.append(category)
                 }
-            )
-        }
-        .alert("Clear All Data?", isPresented: $showClearDataAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive) {
-                viewModel.clearAllData()
-            }
-        } message: {
-            Text(
-                "This will remove all budget categories, income data, and budget plans. This action cannot be undone."
             )
         }
     }

@@ -8,42 +8,30 @@ struct ContentView: View {
     @State private var refreshTask: Task<Void, Never>?
 
     var body: some View {
-        Group {
-            if dashboardViewModel.isEmailConnected {
-                MainTabView()
-                    .environmentObject(dashboardViewModel)
-                    .environmentObject(budgetViewModel)
-                    .environmentObject(historyViewModel)
-            } else {
-                NavigationView {
-                    EmailSetupView()
-                }
+        MainTabView()
+            .environmentObject(dashboardViewModel)
+            .environmentObject(budgetViewModel)
+            .environmentObject(historyViewModel)
+            .onChange(of: scenePhase) { newPhase in
+                handleScenePhaseChange(newPhase)
             }
-        }
-        .onChange(of: scenePhase) { newPhase in
-            handleScenePhaseChange(newPhase)
-        }
-        .task {
-            if dashboardViewModel.isEmailConnected {
+            .task {
                 refreshTask = Task {
                     await dashboardViewModel.refreshData()
                 }
             }
-        }
-        .onDisappear {
-            refreshTask?.cancel()
-            refreshTask = nil
-        }
+            .onDisappear {
+                refreshTask?.cancel()
+                refreshTask = nil
+            }
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {
         switch phase {
         case .active:
             print("🔄 [ContentView] App became active")
-            if dashboardViewModel.isEmailConnected {
-                Task {
-                    await dashboardViewModel.refreshData()
-                }
+            Task {
+                await dashboardViewModel.refreshData()
             }
 
         case .inactive:

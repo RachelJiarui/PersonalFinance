@@ -18,6 +18,8 @@ DerivedData/
 # Environment
 .env
 .env.local
+.env.yaml
+env.yaml
 
 # Swift Package Manager
 .build/

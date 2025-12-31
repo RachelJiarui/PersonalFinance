@@ -18,12 +18,8 @@
 		1A000038 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000012 /* KeychainService.swift */; };
 		1A000039 /* BudgetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000014 /* BudgetService.swift */; };
 		1A00003A /* CategoryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000016 /* CategoryCard.swift */; };
-		1A00003C /* TransactionAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000042 /* TransactionAlert.swift */; };
 		1A00003E /* TransactionStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000044 /* TransactionStorageService.swift */; };
-		1A00003F /* EmailSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000045 /* EmailSetupView.swift */; };
 		1A000040 /* ManualEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000048 /* ManualEntryView.swift */; };
-		1A000041 /* NeedsEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000049 /* NeedsEntryView.swift */; };
-		1A00004A /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000043 /* EmailService.swift */; };
 		1CD1A1B56AA728C87AFB942E /* DebtService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DBF7F264C2F518E52B125 /* DebtService.swift */; };
 		22FAC9F59FEC92C48CD8FB82 /* AllocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */; };
 		27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3677BCF0A539CB986B5C63FD /* Fund.swift */; };
@@ -63,12 +59,8 @@
 		1A000012 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		1A000014 /* BudgetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetService.swift; sourceTree = "<group>"; };
 		1A000016 /* CategoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryCard.swift; sourceTree = "<group>"; };
-		1A000042 /* TransactionAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAlert.swift; sourceTree = "<group>"; };
-		1A000043 /* EmailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailService.swift; sourceTree = "<group>"; };
 		1A000044 /* TransactionStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStorageService.swift; sourceTree = "<group>"; };
-		1A000045 /* EmailSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSetupView.swift; sourceTree = "<group>"; };
 		1A000048 /* ManualEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualEntryView.swift; sourceTree = "<group>"; };
-		1A000049 /* NeedsEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsEntryView.swift; sourceTree = "<group>"; };
 		3677BCF0A539CB986B5C63FD /* Fund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fund.swift; sourceTree = "<group>"; };
 		73E0DAAE7F3A4695195AF185 /* PerennialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerennialView.swift; sourceTree = "<group>"; };
 		92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationService.swift; sourceTree = "<group>"; };
@@ -133,7 +125,6 @@
 			isa = PBXGroup;
 			children = (
 				1A00000C /* Transaction.swift */,
-				1A000042 /* TransactionAlert.swift */,
 				CCF192172EFF46B90053873B /* BudgetCategory.swift */,
 				CCF192182EFF46B90053873B /* PeriodSnapshot.swift */,
 				CCF192192EFF46B90053873B /* UserIncome.swift */,
@@ -156,9 +147,7 @@
 				1A000004 /* ContentView.swift */,
 				1A000008 /* DashboardView.swift */,
 				1A000016 /* CategoryCard.swift */,
-				1A000045 /* EmailSetupView.swift */,
 				1A000048 /* ManualEntryView.swift */,
-				1A000049 /* NeedsEntryView.swift */,
 				73E0DAAE7F3A4695195AF185 /* PerennialView.swift */,
 				A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */,
 				ABE3D54C69884491F123DF6B /* DebtDetailView.swift */,
@@ -184,7 +173,6 @@
 				CCF192322EFF47050053873B /* TaxService.swift */,
 				1A000012 /* KeychainService.swift */,
 				1A000014 /* BudgetService.swift */,
-				1A000043 /* EmailService.swift */,
 				1A000044 /* TransactionStorageService.swift */,
 				CCF192362EFF47060053873B /* BackendService.swift */,
 				BA4D4D040B401A2E2324017C /* FundService.swift */,
@@ -308,12 +296,8 @@
 				1A000038 /* KeychainService.swift in Sources */,
 				1A000039 /* BudgetService.swift in Sources */,
 				1A00003A /* CategoryCard.swift in Sources */,
-				1A00003C /* TransactionAlert.swift in Sources */,
-				1A00004A /* EmailService.swift in Sources */,
 				1A00003E /* TransactionStorageService.swift in Sources */,
-				1A00003F /* EmailSetupView.swift in Sources */,
 				1A000040 /* ManualEntryView.swift in Sources */,
-				1A000041 /* NeedsEntryView.swift in Sources */,
 				CCF192352EFF47060053873B /* BackendService.swift in Sources */,
 				27E7286EBB14B82EF51DBB7E /* Fund.swift in Sources */,
 				0BB1920308E41E8F573918BD /* Debt.swift in Sources */,

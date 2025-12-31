@@ -37,26 +37,6 @@ class BackendService: ObservableObject {
         return true
     }
 
-    // MARK: - Device Token
-
-    func updateDeviceToken(_ token: String) async throws {
-        let url = URL(string: "\(baseURL)/settings/device-token")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = ["device_token": token]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-    }
-
     // MARK: - Transactions
 
     func fetchTransactions() async throws -> [Transaction] {
@@ -88,17 +68,13 @@ class BackendService: ObservableObject {
                 let timestampString = dict["timestamp"] as? String,
                 let timestamp = dateFormatter.date(from: timestampString)
             {
-
-                let linkedEmailAlertId = dict["linked_email_alert_id"] as? String
-
                 let transaction = Transaction(
                     id: id,
                     amount: amount,
                     date: date,
                     title: title,
                     isExpense: isExpense,
-                    timestamp: timestamp,
-                    linkedEmailAlertId: linkedEmailAlertId
+                    timestamp: timestamp
                 )
                 transactions.append(transaction)
             }
@@ -114,17 +90,13 @@ class BackendService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
-        var body: [String: Any] = [
+        let body: [String: Any] = [
             "amount": transaction.amount,
             "title": transaction.title,
             "is_expense": transaction.isExpense,
             "date": dateFormatter.string(from: transaction.date),
             "timestamp": dateFormatter.string(from: transaction.timestamp),
         ]
-
-        if let linkedAlertId = transaction.linkedEmailAlertId {
-            body["linked_email_alert_id"] = linkedAlertId
-        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -166,110 +138,6 @@ class BackendService: ObservableObject {
         let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    func linkTransactionToAlert(transactionId: String, alertId: String) async throws {
-        let url = URL(string: "\(baseURL)/transactions/\(transactionId)/link-alert")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = ["alert_id": alertId]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    // MARK: - Transaction Alerts
-
-    func fetchTransactionAlerts(resolved: Bool? = nil) async throws -> [TransactionAlert] {
-        var urlString = "\(baseURL)/transaction-alerts"
-        if let resolved = resolved {
-            let status = resolved ? "linked" : "unlinked"
-            urlString += "?status=\(status)"
-        }
-
-        let url = URL(string: urlString)!
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let alertsArray = json["alerts"] as? [[String: Any]]
-        else {
-            throw BackendError.invalidData
-        }
-
-        let dateFormatter = ISO8601DateFormatter()
-        var alerts: [TransactionAlert] = []
-
-        for dict in alertsArray {
-            if let id = dict["id"] as? String,
-                let emailId = dict["email_id"] as? String,
-                let merchant = dict["merchant"] as? String,
-                let amount = dict["amount"] as? Double,
-                let dateString = dict["date"] as? String,
-                let date = dateFormatter.date(from: dateString),
-                let rawEmailBody = dict["raw_email_body"] as? String,
-                let receivedAtString = dict["received_at"] as? String,
-                let receivedAt = dateFormatter.date(from: receivedAtString)
-            {
-
-                let linkedTransactionId = dict["linked_transaction_id"] as? String
-
-                let alert = TransactionAlert(
-                    id: id,
-                    emailId: emailId,
-                    merchant: merchant,
-                    date: date,
-                    amount: amount,
-                    rawEmailBody: rawEmailBody,
-                    receivedAt: receivedAt,
-                    linkedTransactionId: linkedTransactionId
-                )
-                alerts.append(alert)
-            }
-        }
-
-        return alerts
-    }
-
-    func deleteTransactionAlert(_ alertId: String) async throws {
-        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    func unlinkTransactionAlert(_ alertId: String) async throws {
-        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)/unlink")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
 
         let (_, response) = try await URLSession.shared.data(for: request)
 

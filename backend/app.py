@@ -3,8 +3,6 @@ BudgetInsight Backend Server (Single-User Refactored)
 Flask API for rachel.j.chen@gmail.com
 """
 
-import base64
-import json
 import os
 from datetime import datetime
 
@@ -12,18 +10,6 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from services.firestore_service import FirestoreService
-from services.gmail_service import GmailService
-from services.pubsub_service import PubSubService
-from services.transaction_parser import TransactionParser
-
-# Try to import APNs service (optional)
-try:
-    from services.apns_service import APNsService
-
-    APNS_AVAILABLE = True
-except ImportError:
-    print("⚠️ APNs service not available - push notifications disabled")
-    APNS_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -35,10 +21,6 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
 
 # Initialize services
 db = FirestoreService()
-gmail_service = GmailService()
-pubsub_service = PubSubService()
-apns_service = APNsService() if APNS_AVAILABLE else None
-transaction_parser = TransactionParser()
 
 # ============================================================================
 # HEALTH CHECK
@@ -55,104 +37,9 @@ def health_check():
             "user": db.user_email,
             "services": {
                 "firestore": True,
-                "pubsub": pubsub_service.is_connected(),
             },
         }
     )
-
-
-# ============================================================================
-# GMAIL WEBHOOK (unchanged - still needed for email processing)
-# ============================================================================
-
-
-@app.route("/webhooks/gmail", methods=["POST"])
-def gmail_webhook():
-    """Receives Gmail push notifications from Google Cloud Pub/Sub"""
-    try:
-        if not pubsub_service.verify_push_request(request):
-            return jsonify({"error": "Unauthorized"}), 401
-
-        envelope = request.get_json()
-        if not envelope:
-            return jsonify({"error": "No Pub/Sub message received"}), 400
-
-        pubsub_message = envelope.get("message", {})
-        if not pubsub_message:
-            return jsonify({"error": "Invalid Pub/Sub message"}), 400
-
-        data = base64.b64decode(pubsub_message.get("data", "")).decode("utf-8")
-        notification = json.loads(data)
-
-        email_address = notification.get("emailAddress")
-        history_id = notification.get("historyId")
-
-        if email_address != db.user_email:
-            return jsonify({"error": "Unauthorized email"}), 403
-
-        process_gmail_notification(email_address, history_id)
-        return jsonify({"success": True}), 200
-
-    except Exception as e:
-        print(f"❌ Error processing Gmail webhook: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-
-def process_gmail_notification(email_address, history_id):
-    """Process Gmail notification - parse emails and create alerts"""
-    try:
-        settings = db.get_settings()
-        last_history_id = settings.get("last_history_id", history_id)
-
-        messages = gmail_service.get_message_history(
-            user_id=email_address, start_history_id=last_history_id
-        )
-
-        print(f"📬 Found {len(messages)} new messages")
-
-        discover_filter = os.getenv(
-            "EMAIL_FROM_FILTER", "discover@services.discover.com"
-        )
-        transaction_alerts = []
-
-        for message in messages:
-            if gmail_service.is_from_sender(message, discover_filter):
-                alert = transaction_parser.parse_discover_email(message)
-                if alert:
-                    transaction_alerts.append(alert)
-                    db.create_transaction_alert(alert)
-
-        print(f"💰 Parsed {len(transaction_alerts)} transaction alerts")
-
-        # Send push notifications
-        if transaction_alerts and apns_service:
-            device_tokens = db.get_device_tokens()
-            for token in device_tokens:
-                if len(transaction_alerts) == 1:
-                    alert = transaction_alerts[0]
-                    body = f"${alert.get('amount', 0):.2f} at {alert.get('merchant', 'Unknown')}"
-                else:
-                    total = sum(alert.get("amount", 0) for alert in transaction_alerts)
-                    body = (
-                        f"${total:.2f} total - {len(transaction_alerts)} transactions"
-                    )
-
-                apns_service.send_notification(
-                    device_token=token,
-                    title="New Transaction Alert",
-                    body=body,
-                    badge=len(transaction_alerts),
-                    data={
-                        "type": "transaction_alert",
-                        "alert_count": len(transaction_alerts),
-                    },
-                )
-
-        db.update_history_id(history_id)
-
-    except Exception as e:
-        print(f"❌ Error processing notification: {str(e)}")
-        raise
 
 
 # ============================================================================
@@ -164,25 +51,11 @@ def process_gmail_notification(email_address, history_id):
 def get_settings():
     """Get app settings"""
     try:
-        settings = db.get_settings()
-        return jsonify(settings), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/settings/device-token", methods=["POST"])
-def update_device_token():
-    """Register device token for push notifications"""
-    try:
-        data = request.get_json()
-        device_token = data.get("device_token")
-
-        if not device_token:
-            return jsonify({"error": "device_token required"}), 400
-
-        db.update_device_token(device_token)
-        return jsonify({"success": True}), 200
-
+        return jsonify(
+            {
+                "email": db.user_email,
+            }
+        ), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -288,71 +161,6 @@ def delete_transaction(transaction_id):
     """Delete a transaction"""
     try:
         db.delete_transaction(transaction_id)
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/transactions/<transaction_id>/link-alert", methods=["PUT"])
-def link_transaction_to_alert(transaction_id):
-    """Link a transaction to an alert"""
-    try:
-        data = request.get_json()
-        alert_id = data.get("alert_id")
-
-        if not alert_id:
-            return jsonify({"error": "alert_id required"}), 400
-
-        db.link_transaction_to_alert(transaction_id, alert_id)
-        return jsonify({"success": True}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# ============================================================================
-# TRANSACTION ALERTS
-# ============================================================================
-
-
-@app.route("/api/transaction-alerts", methods=["GET"])
-def get_transaction_alerts():
-    """Get transaction alerts (query param: ?status=all|linked|unlinked)"""
-    try:
-        status = request.args.get("status", "all")
-        alerts = db.get_transaction_alerts(status=status)
-        return jsonify({"alerts": alerts}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/transaction-alerts/<alert_id>", methods=["GET"])
-def get_transaction_alert(alert_id):
-    """Get a specific transaction alert"""
-    try:
-        alert = db.get_transaction_alert(alert_id)
-        if not alert:
-            return jsonify({"error": "Alert not found"}), 404
-        return jsonify(alert), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/transaction-alerts/<alert_id>/unlink", methods=["PUT"])
-def unlink_alert(alert_id):
-    """Unlink an alert from its transaction"""
-    try:
-        db.unlink_alert(alert_id)
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/transaction-alerts/<alert_id>", methods=["DELETE"])
-def delete_transaction_alert(alert_id):
-    """Delete a transaction alert"""
-    try:
-        db.delete_transaction_alert(alert_id)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

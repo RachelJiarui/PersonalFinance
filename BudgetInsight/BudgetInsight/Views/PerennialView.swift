@@ -92,6 +92,7 @@ struct PerennialView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Perennial")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {

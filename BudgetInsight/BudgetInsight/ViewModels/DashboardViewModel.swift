@@ -8,13 +8,9 @@ class DashboardViewModel: ObservableObject {
     @Published var userIncome: UserIncome?
     @Published var categorySpending: [String: Double] = [:]
     @Published var isLoading: Bool = false
-    @Published var isEmailConnected: Bool = false
     @Published var transactions: [Transaction] = []
-    @Published var transactionAlerts: [TransactionAlert] = []
-    @Published var unlinkedAlertsCount: Int = 0
     @Published var errorMessage: String?
 
-    private let emailService = EmailService.shared
     private let storageService = TransactionStorageService.shared
     private let budgetService = BudgetService.shared
     private let snapshotService = SnapshotService.shared
@@ -23,22 +19,13 @@ class DashboardViewModel: ObservableObject {
 
     init() {
         setupSubscriptions()
-        checkEmailConnection()
         loadLocalData()
     }
 
     private func setupSubscriptions() {
-        // Email connection status
-        emailService.$isAuthenticated
-            .assign(to: &$isEmailConnected)
-
         // Storage service transactions
         storageService.$transactions
             .assign(to: &$transactions)
-
-        // Storage service alerts
-        storageService.$transactionAlerts
-            .assign(to: &$transactionAlerts)
 
         // Budget service
         budgetService.$budgetCategories
@@ -52,17 +39,6 @@ class DashboardViewModel: ObservableObject {
 
         budgetService.$categorySpending
             .assign(to: &$categorySpending)
-
-        // Update unlinked alerts count whenever alerts change
-        storageService.$transactionAlerts
-            .map { alerts in
-                alerts.filter { !$0.isResolved }.count
-            }
-            .assign(to: &$unlinkedAlertsCount)
-    }
-
-    func checkEmailConnection() {
-        isEmailConnected = emailService.isAuthenticated
     }
 
     func loadLocalData() {
@@ -82,11 +58,6 @@ class DashboardViewModel: ObservableObject {
 
             try Task.checkCancellation()
 
-            // Transaction alerts are now created via pub/sub notifications
-            // No need to poll Gmail directly - they come from Firestore
-
-            try Task.checkCancellation()
-
             // Update category spending with current transactions
             budgetService.updateCategorySpending(with: storageService.transactions)
 
@@ -99,7 +70,7 @@ class DashboardViewModel: ObservableObject {
             }
 
             print(
-                "🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions, \(unlinkedAlertsCount) alerts need entry\n"
+                "🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions\n"
             )
         } catch is CancellationError {
             print("⏹️ [DashboardViewModel] Refresh cancelled")
@@ -125,21 +96,6 @@ class DashboardViewModel: ObservableObject {
             }
             print(
                 "✅ [DashboardViewModel] Synced \(backendTransactions.count) transactions from backend (source of truth)"
-            )
-
-            try Task.checkCancellation()
-
-            // Fetch unresolved transaction alerts
-            print("📥 [DashboardViewModel] Fetching unresolved alerts from backend...")
-            let backendAlerts = try await backendService.fetchTransactionAlerts(resolved: false)
-
-            // Use Firestore as source of truth - replace local data entirely
-            await MainActor.run {
-                storageService.transactionAlerts = backendAlerts
-                storageService.persistTransactionAlerts()
-            }
-            print(
-                "✅ [DashboardViewModel] Synced \(backendAlerts.count) unresolved alerts from backend (source of truth)"
             )
 
             try Task.checkCancellation()
@@ -206,14 +162,9 @@ class DashboardViewModel: ObservableObject {
         }
     }
 
-    func createManualEntry(transaction: Transaction, linkedAlertId: String?) {
+    func createManualEntry(transaction: Transaction) {
         // Save transaction
         storageService.saveTransaction(transaction)
-
-        // Link to alert if provided
-        if let alertId = linkedAlertId {
-            storageService.linkAlert(id: alertId, toTransactionId: transaction.id)
-        }
 
         // Update category spending
         budgetService.updateCategorySpending(with: storageService.transactions)
@@ -222,7 +173,7 @@ class DashboardViewModel: ObservableObject {
     }
 
     func disconnect() {
-        emailService.disconnect()
+        // Disconnect method kept for compatibility
     }
 
     func cancelAllTasks() {
@@ -249,44 +200,6 @@ class DashboardViewModel: ObservableObject {
         }
 
         print("✅ [DashboardViewModel] Synchronous update complete")
-    }
-
-    // MARK: - Test Function: Fetch One Email Alert
-
-    func fetchOneEmailAlert() async {
-        print("📧 [DashboardViewModel] Fetching one email alert for testing...")
-
-        do {
-            try Task.checkCancellation()
-
-            // Fetch alerts from Gmail
-            let newAlerts = try await emailService.pollForNewAlerts()
-
-            try Task.checkCancellation()
-
-            // Save just the first one for testing
-            if let firstAlert = newAlerts.first {
-                // Check if it already exists
-                if !storageService.transactionAlerts.contains(where: {
-                    $0.emailId == firstAlert.emailId
-                }) {
-                    storageService.saveTransactionAlert(firstAlert)
-                    print(
-                        "✅ [DashboardViewModel] Saved test alert: \(firstAlert.merchant) - $\(firstAlert.amount)"
-                    )
-                } else {
-                    print("ℹ️ [DashboardViewModel] Alert already exists")
-                }
-            } else {
-                print("ℹ️ [DashboardViewModel] No new alerts found")
-            }
-
-        } catch is CancellationError {
-            print("⏹️ [DashboardViewModel] Fetch cancelled")
-        } catch {
-            print("❌ [DashboardViewModel] Failed to fetch alert: \(error)")
-            errorMessage = "Failed to fetch email alert: \(error.localizedDescription)"
-        }
     }
 
     // MARK: - Helper Methods

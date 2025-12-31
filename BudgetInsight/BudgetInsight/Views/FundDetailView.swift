@@ -226,8 +226,7 @@ struct FundDetailView: View {
             date: Date(),
             title: "Transfer from \(fund.name) (Deleted)",
             isExpense: false,  // It's income - money being moved to other destinations
-            timestamp: Date(),
-            linkedEmailAlertId: nil
+            timestamp: Date()
         )
 
         // Save transaction to backend
@@ -243,8 +242,7 @@ struct FundDetailView: View {
                         date: transaction.date,
                         title: transaction.title,
                         isExpense: transaction.isExpense,
-                        timestamp: transaction.timestamp,
-                        linkedEmailAlertId: nil
+                        timestamp: transaction.timestamp
                     )
                 )
 

@@ -15,13 +15,9 @@ struct Transaction: Identifiable, Codable {
     // Automatic
     let timestamp: Date  // Auto-set to now() when creating transaction
 
-    // Optional
-    let linkedEmailAlertId: String?  // Links to TransactionAlert when matched
-
     init(
         id: String = "", amount: Double, date: Date, title: String,
-        isExpense: Bool, timestamp: Date = Date(),
-        linkedEmailAlertId: String? = nil
+        isExpense: Bool, timestamp: Date = Date()
     ) {
         self.id = id
         self.amount = amount
@@ -29,6 +25,5 @@ struct Transaction: Identifiable, Codable {
         self.title = title
         self.isExpense = isExpense
         self.timestamp = timestamp
-        self.linkedEmailAlertId = linkedEmailAlertId
     }
 }

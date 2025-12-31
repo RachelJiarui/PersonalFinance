@@ -17,15 +17,10 @@ struct EditTransactionView: View {
     @State private var title: String = ""
     @State private var date: Date = Date()
     @State private var isExpense: Bool = true
-    @State private var selectedAlertId: String? = nil
 
     // Allocation management
     @State private var allocations: [AllocationItem] = []
     @State private var showAddAllocation: Bool = false
-
-    // Matching
-    @State private var matchingAlerts: [TransactionAlert] = []
-    @State private var availableAlerts: [TransactionAlert] = []
 
     // UI state
     @State private var showError: Bool = false
@@ -52,7 +47,6 @@ struct EditTransactionView: View {
                                 } else {
                                     amount = filtered
                                 }
-                                updateMatchingAlerts()
                             }
                     }
 
@@ -66,9 +60,6 @@ struct EditTransactionView: View {
                         selection: $date,
                         displayedComponents: [.date]
                     )
-                    .onChange(of: date) { _ in
-                        updateMatchingAlerts()
-                    }
                 }
 
                 // MARK: - Transaction Type (Checkbox style)
@@ -116,56 +107,6 @@ struct EditTransactionView: View {
                         showAddAllocation = true
                     }) {
                         Label("Add Allocation", systemImage: "plus.circle.fill")
-                            .foregroundColor(.blue)
-                    }
-                }
-
-                // MARK: - Link to Transaction Alert (Optional)
-                Section(header: Text("Link to Email Alert (Optional)")) {
-                    Picker("Transaction Alert", selection: $selectedAlertId) {
-                        Text("None").tag(nil as String?)
-
-                        if !matchingAlerts.isEmpty {
-                            Text("── Matching Alerts ──").tag(nil as String?)
-                            ForEach(matchingAlerts) { alert in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(alert.merchant)
-                                        Text(
-                                            "$\(String(format: "%.2f", alert.amount)) • \(formattedDate(alert.date))"
-                                        )
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                }
-                                .tag(alert.id as String?)
-                            }
-                        }
-
-                        if !availableAlerts.isEmpty {
-                            Text("── All Unresolved Alerts ──").tag(nil as String?)
-                            ForEach(availableAlerts) { alert in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(alert.merchant)
-                                        Text(
-                                            "$\(String(format: "%.2f", alert.amount)) • \(formattedDate(alert.date))"
-                                        )
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    }
-                                }
-                                .tag(alert.id as String?)
-                            }
-                        }
-                    }
-
-                    if !matchingAlerts.isEmpty {
-                        Text("💡 \(matchingAlerts.count) alert(s) match this amount and date")
-                            .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
@@ -265,7 +206,6 @@ struct EditTransactionView: View {
         title = originalTransaction.title
         date = originalTransaction.date
         isExpense = originalTransaction.isExpense
-        selectedAlertId = originalTransaction.linkedEmailAlertId
 
         // Convert existing allocations to AllocationItems
         allocations = originalAllocations.map { allocation in
@@ -275,29 +215,6 @@ struct EditTransactionView: View {
                 amount: allocation.amount
             )
         }
-
-        // Load all unresolved alerts (plus the currently linked one if exists)
-        var alerts = storageService.getUnlinkedAlerts()
-        if let linkedId = originalTransaction.linkedEmailAlertId,
-            let linkedAlert = storageService.transactionAlerts.first(where: { $0.id == linkedId })
-        {
-            // Include the currently linked alert even if it's resolved
-            if !alerts.contains(where: { $0.id == linkedId }) {
-                alerts.append(linkedAlert)
-            }
-        }
-        availableAlerts = alerts
-
-        updateMatchingAlerts()
-    }
-
-    private func updateMatchingAlerts() {
-        guard let amountValue = Double(amount) else {
-            matchingAlerts = []
-            return
-        }
-
-        matchingAlerts = storageService.findMatchingAlerts(amount: amountValue, date: date)
     }
 
     private func deleteAllocation(_ allocation: AllocationItem) {
@@ -394,21 +311,12 @@ struct EditTransactionView: View {
 
                 // Step 3: Update the transaction itself
                 let dateFormatter = ISO8601DateFormatter()
-                var updates: [String: Any] = [
+                let updates: [String: Any] = [
                     "amount": amountValue,
                     "title": title,
                     "is_expense": isExpense,
                     "date": dateFormatter.string(from: date),
                 ]
-
-                // Handle alert linking changes
-                if selectedAlertId != originalTransaction.linkedEmailAlertId {
-                    if let newAlertId = selectedAlertId {
-                        updates["linked_email_alert_id"] = newAlertId
-                    } else {
-                        updates["linked_email_alert_id"] = NSNull()
-                    }
-                }
 
                 // Update in Firestore
                 try await backendService.updateTransaction(
@@ -425,40 +333,10 @@ struct EditTransactionView: View {
                             date: date,
                             title: title,
                             isExpense: isExpense,
-                            timestamp: originalTransaction.timestamp,
-                            linkedEmailAlertId: selectedAlertId
+                            timestamp: originalTransaction.timestamp
                         )
                         storageService.transactions[index] = updatedTransaction
                         storageService.persistTransactions()
-                    }
-
-                    // Handle alert linking
-                    if let oldAlertId = originalTransaction.linkedEmailAlertId,
-                        oldAlertId != selectedAlertId
-                    {
-                        // Unlink old alert
-                        if let alertIndex = storageService.transactionAlerts.firstIndex(where: {
-                            $0.id == oldAlertId
-                        }) {
-                            let oldAlert = storageService.transactionAlerts[alertIndex]
-                            let unlinkedAlert = TransactionAlert(
-                                id: oldAlert.id,
-                                emailId: oldAlert.emailId,
-                                merchant: oldAlert.merchant,
-                                date: oldAlert.date,
-                                amount: oldAlert.amount,
-                                rawEmailBody: oldAlert.rawEmailBody,
-                                receivedAt: oldAlert.receivedAt,
-                                linkedTransactionId: nil
-                            )
-                            storageService.transactionAlerts[alertIndex] = unlinkedAlert
-                            storageService.persistTransactionAlerts()
-                        }
-                    }
-
-                    if let newAlertId = selectedAlertId {
-                        storageService.linkAlert(
-                            id: newAlertId, toTransactionId: originalTransaction.id)
                     }
 
                     // Update category spending (instant UI update)
@@ -515,11 +393,5 @@ struct EditTransactionView: View {
     private func showErrorAlert(_ message: String) {
         errorMessage = message
         showError = true
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        return formatter.string(from: date)
     }
 }

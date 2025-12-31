@@ -23,11 +23,6 @@ service cloud.firestore {
       allow read, write: if isRachel();
     }
 
-    // Transaction Alerts - read/write for Rachel
-    match /transaction_alerts/{alertId} {
-      allow read, write: if isRachel();
-    }
-
     // Budget - read/write for Rachel
     match /budget/{document=**} {
       allow read, write: if isRachel();
