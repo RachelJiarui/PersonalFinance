@@ -109,7 +109,13 @@ struct MonthEndBalancingView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showReviewData) {
+            .sheet(
+                isPresented: $viewModel.showReviewData,
+                onDismiss: {
+                    // Refresh stats when returning from ReviewData
+                    viewModel.refreshCurrentMonthStats()
+                }
+            ) {
                 if let month = currentMonth {
                     ReviewDataView(year: month.year, month: month.month)
                 }

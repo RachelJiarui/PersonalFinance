@@ -150,6 +150,7 @@ struct ManualEntryView: View {
                     transactionAmount: Double(amount) ?? 0.0,
                     currentAllocations: allocations,
                     isExpense: isExpense,
+                    transactionDate: date,
                     onAdd: { newAllocation in
                         allocations.append(newAllocation)
                     }
@@ -389,11 +390,13 @@ struct AddAllocationView: View {
     let transactionAmount: Double
     let currentAllocations: [AllocationItem]
     let isExpense: Bool  // New parameter to determine transaction type
+    let transactionDate: Date  // Date of the transaction to check correct month spending
     let onAdd: (AllocationItem) -> Void
 
     @StateObject private var budgetService = BudgetService.shared
     @StateObject private var fundService = FundService.shared
     @StateObject private var debtService = DebtService.shared
+    @StateObject private var transactionService = TransactionStorageService.shared
 
     @State private var selectedType: AllocationType = .category
     @State private var selectedDestinationId: String = ""
@@ -502,6 +505,28 @@ struct AddAllocationView: View {
         return transactionAmount - totalAllocated
     }
 
+    /// Calculate category spending for the transaction's specific month
+    private func getCategorySpendingForTransactionMonth(categoryId: String) -> Double {
+        let calendar = Calendar.current
+        let transactionYear = calendar.component(.year, from: transactionDate)
+        let transactionMonth = calendar.component(.month, from: transactionDate)
+
+        // Get all transactions for the same month as this transaction
+        let monthTransactions = transactionService.transactions.filter { transaction in
+            let txYear = calendar.component(.year, from: transaction.date)
+            let txMonth = calendar.component(.month, from: transaction.date)
+            return txYear == transactionYear && txMonth == transactionMonth && transaction.isExpense
+        }
+
+        // Calculate spending for this category in that month
+        let categoryAllocations = AllocationService.shared.allocations.filter { allocation in
+            allocation.destinationType == .category && allocation.destinationId == categoryId
+                && monthTransactions.contains(where: { $0.id == allocation.transactionId })
+        }
+
+        return categoryAllocations.reduce(0.0) { $0 + $1.amount }
+    }
+
     private var isValid: Bool {
         guard !selectedDestinationId.isEmpty,
             let amountValue = Double(amount),
@@ -510,9 +535,10 @@ struct AddAllocationView: View {
             return false
         }
 
-        // For income transactions to categories, check against category spending
+        // For income transactions to categories, check against category spending FOR THE TRANSACTION'S MONTH
         if !isExpense && selectedType == .category {
-            let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+            let categorySpending = getCategorySpendingForTransactionMonth(
+                categoryId: selectedDestinationId)
             // Can't reimburse more than what was spent
             return amountValue <= categorySpending
         }
@@ -529,10 +555,11 @@ struct AddAllocationView: View {
             return nil
         }
 
-        let categorySpending = budgetService.categorySpending[selectedDestinationId] ?? 0.0
+        let categorySpending = getCategorySpendingForTransactionMonth(
+            categoryId: selectedDestinationId)
         if amountValue > categorySpending {
             return
-                "Cannot reimburse $\(String(format: "%.2f", amountValue)) to a category with only $\(String(format: "%.2f", categorySpending)) spent"
+                "Cannot reimburse $\(String(format: "%.2f", amountValue)) to a category with only $\(String(format: "%.2f", categorySpending)) spent in this month"
         }
 
         return nil
@@ -561,12 +588,8 @@ struct AddAllocationView: View {
                         return false
                     }
 
-                    // For income transactions, only show categories with spending > 0
-                    if !isExpense {
-                        let spending = budgetService.categorySpending[category.id] ?? 0.0
-                        return spending > 0
-                    }
-
+                    // For income transactions, show all categories
+                    // (user might be reimbursing for past expenses or current month expenses)
                     return true
                 }
                 .map { (id: $0.id, name: $0.name, icon: $0.icon) }

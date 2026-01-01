@@ -146,6 +146,7 @@ struct EditTransactionView: View {
                     transactionAmount: Double(amount) ?? 0.0,
                     currentAllocations: allocations,
                     isExpense: isExpense,
+                    transactionDate: date,
                     onAdd: { newAllocation in
                         allocations.append(newAllocation)
                     }

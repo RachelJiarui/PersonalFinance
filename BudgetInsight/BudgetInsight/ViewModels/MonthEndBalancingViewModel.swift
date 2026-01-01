@@ -27,6 +27,39 @@ class MonthEndBalancingViewModel: ObservableObject {
         errorMessage = nil
     }
 
+    /// Refresh stats for the current month (e.g., after editing transactions)
+    func refreshCurrentMonthStats() {
+        guard let stats = currentMonthStats else { return }
+
+        // Recalculate stats with updated transactions
+        guard
+            let newStats = balancingService.calculateMonthStats(
+                year: stats.year, month: stats.month)
+        else {
+            errorMessage = "Unable to refresh statistics"
+            return
+        }
+
+        // Preserve existing allocations by category ID
+        let existingAllocations = categoryBalances.reduce(into: [String: BalancingDestination]()) {
+            result, balance in
+            if let destination = balance.allocatedTo {
+                result[balance.category.id] = destination
+            }
+        }
+
+        // Update stats and category balances
+        currentMonthStats = newStats
+        categoryBalances = newStats.categoryBalances
+
+        // Re-apply existing allocations
+        for index in categoryBalances.indices {
+            if let destination = existingAllocations[categoryBalances[index].category.id] {
+                categoryBalances[index].allocatedTo = destination
+            }
+        }
+    }
+
     // MARK: - Navigation
 
     func canProceedToNextStep() -> Bool {

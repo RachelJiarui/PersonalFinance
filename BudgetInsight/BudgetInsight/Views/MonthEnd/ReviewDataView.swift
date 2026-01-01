@@ -7,8 +7,6 @@ struct ReviewDataView: View {
     @StateObject private var transactionService = TransactionStorageService.shared
     @StateObject private var budgetService = BudgetService.shared
     @StateObject private var allocationService = AllocationService.shared
-    @State private var selectedTransaction: Transaction?
-    @State private var showEditSheet = false
 
     private var monthTransactions: [Transaction] {
         transactionService.getTransactionsForMonth(year: year, month: month)
@@ -70,6 +68,7 @@ struct ReviewDataView: View {
                         .cornerRadius(12)
                     }
                     .padding(.horizontal)
+                    .id(transactionService.transactions.count)
 
                     // Transactions Section
                     VStack(alignment: .leading, spacing: 12) {
@@ -86,10 +85,13 @@ struct ReviewDataView: View {
                         } else {
                             ForEach(monthTransactions.sorted(by: { $0.date > $1.date })) {
                                 transaction in
-                                Button(action: {
-                                    selectedTransaction = transaction
-                                    showEditSheet = true
-                                }) {
+                                NavigationLink(
+                                    destination: TransactionDetailView(
+                                        transaction: transaction,
+                                        budgetService: budgetService,
+                                        allocationService: allocationService
+                                    )
+                                ) {
                                     SimpleTransactionRow(transaction: transaction)
                                 }
                                 .buttonStyle(PlainButtonStyle())
@@ -129,16 +131,6 @@ struct ReviewDataView: View {
                     Button("Done") {
                         dismiss()
                     }
-                }
-            }
-            .sheet(isPresented: $showEditSheet) {
-                if let transaction = selectedTransaction {
-                    EditTransactionView(
-                        originalTransaction: transaction,
-                        originalAllocations: allocationService.allocations.filter {
-                            $0.transactionId == transaction.id
-                        }
-                    )
                 }
             }
         }
