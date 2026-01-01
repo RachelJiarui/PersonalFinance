@@ -1,6 +1,20 @@
 import Foundation
 import SwiftUI
 
+enum BalancingError: LocalizedError {
+    case defaultFundNotFound
+    case defaultDebtNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .defaultFundNotFound:
+            return "Default fund 'General Savings' not found. Please restart the app."
+        case .defaultDebtNotFound:
+            return "Default debt 'General Debt' not found. Please restart the app."
+        }
+    }
+}
+
 class MonthEndBalancingService: ObservableObject {
     static let shared = MonthEndBalancingService()
 
@@ -18,8 +32,6 @@ class MonthEndBalancingService: ObservableObject {
         let now = Date()
         let currentYear = calendar.component(.year, from: now)
         let currentMonth = calendar.component(.month, from: now)
-
-        var unbalanced: [(Int, Int)] = []
 
         // Get all transactions
         let transactions = TransactionStorageService.shared.transactions
@@ -40,6 +52,8 @@ class MonthEndBalancingService: ObservableObject {
         var checkDate = calendar.date(from: DateComponents(year: firstYear, month: firstMonth))!
         let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: now)!
 
+        var unbalancedList: [(Int, Int)] = []
+
         while checkDate <= previousMonthDate {
             let year = calendar.component(.year, from: checkDate)
             let month = calendar.component(.month, from: checkDate)
@@ -51,21 +65,23 @@ class MonthEndBalancingService: ObservableObject {
             }
 
             if !isMonthBalanced(year: year, month: month) {
-                unbalanced.append((year, month))
+                unbalancedList.append((year, month))
             }
 
             // Move to next month
             checkDate = calendar.date(byAdding: .month, value: 1, to: checkDate)!
         }
 
-        await MainActor.run {
-            self.unbalancedMonths = unbalanced.sorted {
-                ($0.0, $0.1) < ($1.0, $1.1)
-            }
-            self.needsBalancing = !unbalanced.isEmpty
+        let sortedUnbalanced = unbalancedList.sorted {
+            ($0.0, $0.1) < ($1.0, $1.1)
         }
 
-        print("📊 [BalancingService] Found \(unbalanced.count) unbalanced months")
+        await MainActor.run {
+            self.unbalancedMonths = sortedUnbalanced
+            self.needsBalancing = !sortedUnbalanced.isEmpty
+        }
+
+        print("📊 [BalancingService] Found \(unbalancedList.count) unbalanced months")
     }
 
     func isMonthBalanced(year: Int, month: Int) -> Bool {
@@ -267,7 +283,98 @@ class MonthEndBalancingService: ObservableObject {
         }.filter { $0.hasBalance }  // Only include categories with savings or deficits
     }
 
-    // MARK: - Transaction Creation
+    // MARK: - Auto-Allocation to Default Buckets
+
+    func autoAllocateToDefaultBuckets(for stats: MonthWrappedStats) async throws -> [String] {
+        let lastDayOfMonth = getLastDayOfMonth(year: stats.year, month: stats.month)
+        var transactionIds: [String] = []
+
+        print(
+            "💰 [BalancingService] Auto-allocating for \(monthName(stats.month)) \(stats.year)"
+        )
+
+        // Check if there are net savings or deficit
+        if abs(stats.netSavings) < 0.01 {
+            // Perfectly balanced - no transaction needed
+            print("✅ [BalancingService] Month is perfectly balanced, no allocation needed")
+            return []
+        }
+
+        if stats.netSavings > 0 {
+            // Net savings - allocate to default fund
+            guard let defaultFund = FundService.shared.getDefaultFund() else {
+                throw BalancingError.defaultFundNotFound
+            }
+
+            let transaction = Transaction(
+                id: "",
+                amount: stats.netSavings,
+                date: lastDayOfMonth,
+                title: "Month-End: Net Savings → \(defaultFund.name)",
+                isExpense: false,  // Income to the fund
+                timestamp: Date()
+            )
+
+            // Save transaction
+            TransactionStorageService.shared.saveTransaction(transaction)
+            try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+            let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
+
+            // Create allocation to default fund
+            _ = AllocationService.shared.createAllocation(
+                transactionId: tempId,
+                destinationType: .fund,
+                destinationId: defaultFund.id,
+                amount: stats.netSavings,
+                isExpense: false
+            )
+
+            transactionIds.append(tempId)
+            print(
+                "✅ [BalancingService] Allocated $\(String(format: "%.2f", stats.netSavings)) to \(defaultFund.name)"
+            )
+
+        } else {
+            // Net deficit - allocate to default debt
+            guard let defaultDebt = DebtService.shared.getDefaultDebt() else {
+                throw BalancingError.defaultDebtNotFound
+            }
+
+            let deficitAmount = abs(stats.netSavings)
+
+            let transaction = Transaction(
+                id: "",
+                amount: deficitAmount,
+                date: lastDayOfMonth,
+                title: "Month-End: Net Deficit → \(defaultDebt.name)",
+                isExpense: true,  // Expense - adding to debt
+                timestamp: Date()
+            )
+
+            // Save transaction
+            TransactionStorageService.shared.saveTransaction(transaction)
+            try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+            let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
+
+            // Create allocation to default debt
+            _ = AllocationService.shared.createAllocation(
+                transactionId: tempId,
+                destinationType: .debt,
+                destinationId: defaultDebt.id,
+                amount: deficitAmount,
+                isExpense: true
+            )
+
+            transactionIds.append(tempId)
+            print(
+                "✅ [BalancingService] Allocated $\(String(format: "%.2f", deficitAmount)) to \(defaultDebt.name)"
+            )
+        }
+
+        return transactionIds
+    }
+
+    // MARK: - Transaction Creation (Legacy - kept for reference)
 
     func createBalancingTransactions(
         for stats: MonthWrappedStats,

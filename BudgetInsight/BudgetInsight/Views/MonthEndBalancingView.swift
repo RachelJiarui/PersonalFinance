@@ -36,40 +36,28 @@ struct MonthEndBalancingView: View {
                             // Step 1: Month Wrapped
                             MonthWrappedView(
                                 stats: stats,
-                                onReviewData: { viewModel.showReviewData = true },
-                                onNext: { viewModel.nextStep() }
+                                onReviewData: { viewModel.nextStep() },
+                                onNext: { viewModel.currentStep = 2 }
                             )
                             .tag(0)
 
-                            // Step 2: Allocate Savings
-                            VStack(spacing: 0) {
-                                AllocateSavingsView(
-                                    stats: stats,
-                                    categoryBalances: $viewModel.categoryBalances
-                                )
-
-                                navigationButtons
-                            }
+                            // Step 2: Review Data
+                            ReviewDataStepView(
+                                year: stats.year,
+                                month: stats.month,
+                                onNext: {
+                                    viewModel.refreshCurrentMonthStats()
+                                    viewModel.nextStep()
+                                }
+                            )
                             .tag(1)
 
-                            // Step 3: Cover Deficits
-                            VStack(spacing: 0) {
-                                CoverDeficitsView(
-                                    stats: stats,
-                                    categoryBalances: $viewModel.categoryBalances
-                                )
-
-                                navigationButtons
-                            }
-                            .tag(2)
-
-                            // Step 4: Summary
+                            // Step 3: Summary
                             BalancingSummaryView(
                                 stats: stats,
-                                categoryBalances: viewModel.categoryBalances,
                                 onComplete: completeCurrentMonth
                             )
-                            .tag(3)
+                            .tag(2)
                         }
                         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     }
@@ -86,7 +74,7 @@ struct MonthEndBalancingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if viewModel.currentStep > 0 && viewModel.currentStep < 3 {
+                    if viewModel.currentStep > 0 {
                         Button(action: { viewModel.previousStep() }) {
                             HStack {
                                 Image(systemName: "chevron.left")
@@ -107,17 +95,6 @@ struct MonthEndBalancingView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                }
-            }
-            .sheet(
-                isPresented: $viewModel.showReviewData,
-                onDismiss: {
-                    // Refresh stats when returning from ReviewData
-                    viewModel.refreshCurrentMonthStats()
-                }
-            ) {
-                if let month = currentMonth {
-                    ReviewDataView(year: month.year, month: month.month)
                 }
             }
             .alert(
@@ -144,37 +121,6 @@ struct MonthEndBalancingView: View {
         }
     }
 
-    private var navigationButtons: some View {
-        HStack(spacing: 16) {
-            Button(action: { viewModel.previousStep() }) {
-                HStack {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .foregroundColor(.primary)
-                .cornerRadius(10)
-            }
-
-            Button(action: { viewModel.nextStep() }) {
-                HStack {
-                    Text("Next")
-                    Image(systemName: "chevron.right")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(viewModel.canProceedToNextStep() ? Color.blue : Color.gray)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-            }
-            .disabled(!viewModel.canProceedToNextStep())
-        }
-        .padding()
-        .background(Color(.systemBackground))
-    }
-
     private func loadCurrentMonth() {
         guard let month = currentMonth else { return }
         viewModel.loadStatsForMonth(year: month.year, month: month.month)
@@ -196,6 +142,39 @@ struct MonthEndBalancingView: View {
                         // which will automatically dismiss this view
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Review Data Step View
+
+struct ReviewDataStepView: View {
+    let year: Int
+    let month: Int
+    let onNext: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ReviewDataView(year: year, month: month)
+
+            // Navigation Button
+            VStack(spacing: 0) {
+                Divider()
+
+                Button(action: onNext) {
+                    HStack {
+                        Text("Continue to Summary")
+                        Image(systemName: "chevron.right")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .padding()
+                .background(Color(.systemBackground))
             }
         }
     }

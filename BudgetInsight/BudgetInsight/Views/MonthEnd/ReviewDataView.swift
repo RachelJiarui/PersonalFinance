@@ -140,7 +140,7 @@ struct ReviewDataView: View {
                 }
                 .padding(.top)
             }
-            .navigationTitle("\(monthName) \(year) Data")
+            .navigationTitle("\(monthName) \(String(year)) Data")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

@@ -138,36 +138,57 @@ struct DebtDetailView: View {
                 .padding(.vertical)
 
                 // MARK: - Actions
-                VStack(spacing: 12) {
-                    Button(action: {
-                        showEditDebt = true
-                    }) {
-                        HStack {
-                            Image(systemName: "pencil")
-                            Text("Edit Debt")
+                if !debt.isDefault {
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            showEditDebt = true
+                        }) {
+                            HStack {
+                                Image(systemName: "pencil")
+                                Text("Edit Debt")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
 
-                    Button(action: {
-                        showDeleteConfirmation = true
-                    }) {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Delete Debt")
+                        Button(action: {
+                            showDeleteConfirmation = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete Debt")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(10)
                     }
+                    .padding(.horizontal)
+                } else {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "lock.fill")
+                                .foregroundColor(.blue)
+                            Text("This is a default debt")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        Text("Default debts cannot be edited or deleted")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
             .padding(.vertical)
         }

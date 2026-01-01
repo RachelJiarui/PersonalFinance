@@ -14,7 +14,67 @@ class FundService: ObservableObject {
         // Fetch data from Firestore on initialization
         Task {
             await fetchDataFromFirestore()
+            await ensureDefaultFundExists()
         }
+    }
+
+    // MARK: - Default Fund Management
+
+    /// Ensures the default "General Savings" fund exists
+    private func ensureDefaultFundExists() async {
+        // Check if default fund already exists
+        let hasDefaultFund = funds.contains { $0.isDefault && $0.name == "General Savings" }
+
+        if !hasDefaultFund {
+            print("🔄 [FundService] Creating default General Savings fund...")
+
+            let defaultFund = Fund(
+                id: "",
+                name: "General Savings",
+                icon: "dollarsign.circle",
+                description: "Default savings bucket",
+                balance: 0.0,
+                goal: nil,
+                deadline: nil,
+                createdAt: Date(),
+                isActive: true,
+                isDefault: true
+            )
+
+            // Save to Firestore
+            do {
+                let firestoreId = try await BackendService.shared.createFund(defaultFund)
+                print("✅ [FundService] Created default fund in Firestore with ID: \(firestoreId)")
+
+                await MainActor.run {
+                    let fundWithId = Fund(
+                        id: firestoreId,
+                        name: "General Savings",
+                        icon: "dollarsign.circle",
+                        description: "Default savings bucket",
+                        balance: 0.0,
+                        goal: nil,
+                        deadline: nil,
+                        createdAt: defaultFund.createdAt,
+                        isActive: true,
+                        isDefault: true
+                    )
+
+                    if !self.funds.contains(where: { $0.id == firestoreId }) {
+                        self.funds.append(fundWithId)
+                        self.saveFunds()
+                    }
+                }
+            } catch {
+                print("❌ [FundService] Error creating default fund: \(error)")
+            }
+        } else {
+            print("✅ [FundService] Default General Savings fund already exists")
+        }
+    }
+
+    func getDefaultFund() -> Fund? {
+        return funds.first { $0.isDefault && $0.name == "General Savings" && $0.isActive }
     }
 
     // MARK: - Firestore Data Fetching
@@ -156,7 +216,17 @@ class FundService: ObservableObject {
 
     func updateBalance(fundId: String, amount: Double) {
         if let index = funds.firstIndex(where: { $0.id == fundId && $0.isActive }) {
-            funds[index].balance += amount
+            let newBalance = funds[index].balance + amount
+
+            // Prevent balance from going below 0
+            guard newBalance >= 0 else {
+                print(
+                    "❌ [FundService] Cannot update balance: would go below 0 (current: \(funds[index].balance), change: \(amount))"
+                )
+                return
+            }
+
+            funds[index].balance = newBalance
             saveFunds()
 
             // Update in Firestore
@@ -164,7 +234,7 @@ class FundService: ObservableObject {
                 do {
                     try await BackendService.shared.updateFund(
                         fundId: fundId,
-                        updates: ["balance": funds[index].balance]
+                        updates: ["balance": newBalance]
                     )
                     print("✅ [FundService] Updated Fund balance in Firestore")
                 } catch {
@@ -172,6 +242,14 @@ class FundService: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Validates if a balance update is possible without going below 0
+    func canUpdateBalance(fundId: String, amount: Double) -> Bool {
+        guard let fund = funds.first(where: { $0.id == fundId && $0.isActive }) else {
+            return false
+        }
+        return (fund.balance + amount) >= 0
     }
 
     func deleteFund(fundId: String) {

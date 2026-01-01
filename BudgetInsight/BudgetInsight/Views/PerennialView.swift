@@ -27,7 +27,11 @@ struct PerennialView: View {
                     }
                     .padding(.horizontal)
 
-                    if fundService.getActiveFunds().isEmpty {
+                    let activeFunds = fundService.getActiveFunds()
+                    let defaultFunds = activeFunds.filter { $0.isDefault }
+                    let regularFunds = activeFunds.filter { !$0.isDefault }
+
+                    if activeFunds.isEmpty {
                         EmptyStateView(
                             icon: "dollarsign.circle",
                             title: "No Funds Yet",
@@ -38,9 +42,18 @@ struct PerennialView: View {
                             }
                         )
                     } else {
-                        ForEach(fundService.getActiveFunds()) { fund in
+                        // Show default funds first
+                        ForEach(defaultFunds) { fund in
                             NavigationLink(destination: FundDetailView(fund: fund)) {
-                                FundCard(fund: fund)
+                                FundCard(fund: fund, isDefault: true)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
+                        // Then show regular funds
+                        ForEach(regularFunds) { fund in
+                            NavigationLink(destination: FundDetailView(fund: fund)) {
+                                FundCard(fund: fund, isDefault: false)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -67,7 +80,11 @@ struct PerennialView: View {
                     }
                     .padding(.horizontal)
 
-                    if debtService.getActiveDebts().isEmpty {
+                    let activeDebts = debtService.getActiveDebts()
+                    let defaultDebts = activeDebts.filter { $0.isDefault }
+                    let regularDebts = activeDebts.filter { !$0.isDefault }
+
+                    if activeDebts.isEmpty {
                         EmptyStateView(
                             icon: "creditcard",
                             title: "No Debts",
@@ -79,9 +96,18 @@ struct PerennialView: View {
                             }
                         )
                     } else {
-                        ForEach(debtService.getActiveDebts()) { debt in
+                        // Show default debts first
+                        ForEach(defaultDebts) { debt in
                             NavigationLink(destination: DebtDetailView(debt: debt)) {
-                                DebtCard(debt: debt)
+                                DebtCard(debt: debt, isDefault: true)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
+                        // Then show regular debts
+                        ForEach(regularDebts) { debt in
+                            NavigationLink(destination: DebtDetailView(debt: debt)) {
+                                DebtCard(debt: debt, isDefault: false)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -129,6 +155,7 @@ struct PerennialView: View {
 
 struct FundCard: View {
     let fund: Fund
+    let isDefault: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,8 +166,20 @@ struct FundCard: View {
                     .frame(width: 40)
 
                 VStack(alignment: .leading) {
-                    Text(fund.name)
-                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Text(fund.name)
+                            .font(.headline)
+                        if isDefault {
+                            Text("DEFAULT")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue)
+                                .cornerRadius(4)
+                        }
+                    }
                     if !fund.description.isEmpty {
                         Text(fund.description)
                             .font(.caption)
@@ -215,6 +254,7 @@ struct FundCard: View {
 
 struct DebtCard: View {
     let debt: Debt
+    let isDefault: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -225,8 +265,20 @@ struct DebtCard: View {
                     .frame(width: 40)
 
                 VStack(alignment: .leading) {
-                    Text(debt.name)
-                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Text(debt.name)
+                            .font(.headline)
+                        if isDefault {
+                            Text("DEFAULT")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue)
+                                .cornerRadius(4)
+                        }
+                    }
                     if !debt.description.isEmpty {
                         Text(debt.description)
                             .font(.caption)

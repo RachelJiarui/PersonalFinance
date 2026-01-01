@@ -19,6 +19,7 @@ struct Fund: Identifiable, Codable, Equatable {
     // Automatic
     var createdAt: Date  // When fund was created
     var isActive: Bool  // Soft delete flag
+    var isDefault: Bool  // True for default funds (cannot be deleted)
 
     init(
         id: String = "",
@@ -29,7 +30,8 @@ struct Fund: Identifiable, Codable, Equatable {
         goal: Double? = nil,
         deadline: Date? = nil,
         createdAt: Date = Date(),
-        isActive: Bool = true
+        isActive: Bool = true,
+        isDefault: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -40,6 +42,7 @@ struct Fund: Identifiable, Codable, Equatable {
         self.deadline = deadline
         self.createdAt = createdAt
         self.isActive = isActive
+        self.isDefault = isDefault
     }
 
     // Helper methods for UI

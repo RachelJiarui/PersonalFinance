@@ -598,6 +598,7 @@ class BackendService: ObservableObject {
             {
 
                 let goal = dict["goal"] as? Double
+                let isDefault = dict["is_default"] as? Bool ?? false
                 var deadline: Date?
                 if let deadlineString = dict["deadline"] as? String {
                     deadline = dateFormatter.date(from: deadlineString)
@@ -612,7 +613,8 @@ class BackendService: ObservableObject {
                     goal: goal,
                     deadline: deadline,
                     createdAt: createdAt,
-                    isActive: isActive
+                    isActive: isActive,
+                    isDefault: isDefault
                 )
                 funds.append(fund)
             } else {
@@ -637,6 +639,7 @@ class BackendService: ObservableObject {
             "description": fund.description,
             "balance": fund.balance,
             "is_active": fund.isActive,
+            "is_default": fund.isDefault,
             "created_at": dateFormatter.string(from: fund.createdAt),
         ]
 
@@ -739,6 +742,7 @@ class BackendService: ObservableObject {
                 let createdAt = dateFormatter.date(from: createdAtString)
             {
 
+                let isDefault = dict["is_default"] as? Bool ?? false
                 var deadline: Date?
                 if let deadlineString = dict["deadline"] as? String {
                     deadline = dateFormatter.date(from: deadlineString)
@@ -753,7 +757,8 @@ class BackendService: ObservableObject {
                     goal: goal,
                     deadline: deadline,
                     createdAt: createdAt,
-                    isActive: isActive
+                    isActive: isActive,
+                    isDefault: isDefault
                 )
                 debts.append(debt)
             } else {
@@ -779,6 +784,7 @@ class BackendService: ObservableObject {
             "balance": debt.balance,
             "goal": debt.goal,
             "is_active": debt.isActive,
+            "is_default": debt.isDefault,
             "created_at": dateFormatter.string(from: debt.createdAt),
         ]
 

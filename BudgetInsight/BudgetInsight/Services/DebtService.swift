@@ -14,7 +14,67 @@ class DebtService: ObservableObject {
         // Fetch data from Firestore on initialization
         Task {
             await fetchDataFromFirestore()
+            await ensureDefaultDebtExists()
         }
+    }
+
+    // MARK: - Default Debt Management
+
+    /// Ensures the default "General Debt" debt exists
+    private func ensureDefaultDebtExists() async {
+        // Check if default debt already exists
+        let hasDefaultDebt = debts.contains { $0.isDefault && $0.name == "General Debt" }
+
+        if !hasDefaultDebt {
+            print("🔄 [DebtService] Creating default General Debt...")
+
+            let defaultDebt = Debt(
+                id: "",
+                name: "General Debt",
+                icon: "creditcard",
+                description: "Default debt bucket",
+                balance: 0.0,
+                goal: 0.0,
+                deadline: nil,
+                createdAt: Date(),
+                isActive: true,
+                isDefault: true
+            )
+
+            // Save to Firestore
+            do {
+                let firestoreId = try await BackendService.shared.createDebt(defaultDebt)
+                print("✅ [DebtService] Created default debt in Firestore with ID: \(firestoreId)")
+
+                await MainActor.run {
+                    let debtWithId = Debt(
+                        id: firestoreId,
+                        name: "General Debt",
+                        icon: "creditcard",
+                        description: "Default debt bucket",
+                        balance: 0.0,
+                        goal: 0.0,
+                        deadline: nil,
+                        createdAt: defaultDebt.createdAt,
+                        isActive: true,
+                        isDefault: true
+                    )
+
+                    if !self.debts.contains(where: { $0.id == firestoreId }) {
+                        self.debts.append(debtWithId)
+                        self.saveDebts()
+                    }
+                }
+            } catch {
+                print("❌ [DebtService] Error creating default debt: \(error)")
+            }
+        } else {
+            print("✅ [DebtService] Default General Debt already exists")
+        }
+    }
+
+    func getDefaultDebt() -> Debt? {
+        return debts.first { $0.isDefault && $0.name == "General Debt" && $0.isActive }
     }
 
     // MARK: - Firestore Data Fetching
@@ -156,7 +216,17 @@ class DebtService: ObservableObject {
 
     func updateBalance(debtId: String, amount: Double) {
         if let index = debts.firstIndex(where: { $0.id == debtId && $0.isActive }) {
-            debts[index].balance += amount
+            let newBalance = debts[index].balance + amount
+
+            // Prevent balance from going below 0 (can't have negative debt)
+            guard newBalance >= 0 else {
+                print(
+                    "❌ [DebtService] Cannot update balance: would go below 0 (current: \(debts[index].balance), change: \(amount))"
+                )
+                return
+            }
+
+            debts[index].balance = newBalance
             saveDebts()
 
             // Update in Firestore
@@ -164,7 +234,7 @@ class DebtService: ObservableObject {
                 do {
                     try await BackendService.shared.updateDebt(
                         debtId: debtId,
-                        updates: ["balance": debts[index].balance]
+                        updates: ["balance": newBalance]
                     )
                     print("✅ [DebtService] Updated Debt balance in Firestore")
                 } catch {
@@ -172,6 +242,14 @@ class DebtService: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Validates if a balance update is possible without going below 0
+    func canUpdateBalance(debtId: String, amount: Double) -> Bool {
+        guard let debt = debts.first(where: { $0.id == debtId && $0.isActive }) else {
+            return false
+        }
+        return (debt.balance + amount) >= 0
     }
 
     func deleteDebt(debtId: String) {

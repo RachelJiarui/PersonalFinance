@@ -136,36 +136,57 @@ struct FundDetailView: View {
                 .padding(.vertical)
 
                 // MARK: - Actions
-                VStack(spacing: 12) {
-                    Button(action: {
-                        showEditFund = true
-                    }) {
-                        HStack {
-                            Image(systemName: "pencil")
-                            Text("Edit Fund")
+                if !fund.isDefault {
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            showEditFund = true
+                        }) {
+                            HStack {
+                                Image(systemName: "pencil")
+                                Text("Edit Fund")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
 
-                    Button(action: {
-                        showDeleteConfirmation = true
-                    }) {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Delete Fund")
+                        Button(action: {
+                            showDeleteConfirmation = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete Fund")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(10)
                     }
+                    .padding(.horizontal)
+                } else {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "lock.fill")
+                                .foregroundColor(.blue)
+                            Text("This is a default fund")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        Text("Default funds cannot be edited or deleted")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
             .padding(.vertical)
         }

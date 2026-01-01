@@ -2,38 +2,19 @@ import SwiftUI
 
 struct BalancingSummaryView: View {
     let stats: MonthWrappedStats
-    let categoryBalances: [CategoryBalance]
     let onComplete: () -> Void
     @StateObject private var fundService = FundService.shared
     @StateObject private var debtService = DebtService.shared
 
-    private var transactionsToCreate:
-        [(category: String, destination: String, amount: Double, isSurplus: Bool)]
-    {
-        var transactions: [(String, String, Double, Bool)] = []
-
-        for balance in categoryBalances {
-            guard let destination = balance.allocatedTo else { continue }
-
-            let isSurplus = balance.surplus > 0
-            let amount = isSurplus ? balance.surplus : balance.deficit
-
-            let destName: String
-            switch destination.type {
-            case .existingFund(let id):
-                destName = fundService.getFundById(id)?.name ?? "Fund"
-            case .newFund(let name, _, _):
-                destName = name
-            case .existingDebt(let id):
-                destName = debtService.getDebtById(id)?.name ?? "Debt"
-            case .newDebt(let name, _, _, _):
-                destName = name
-            }
-
-            transactions.append((balance.category.name, destName, amount, isSurplus))
+    private var destinationInfo: (name: String, amount: Double, isDebt: Bool)? {
+        if stats.netSavings > 0 {
+            // Positive savings - goes to default fund
+            return ("General Savings", stats.netSavings, false)
+        } else if stats.netSavings < 0 {
+            // Deficit - goes to default debt
+            return ("General Debt", abs(stats.netSavings), true)
         }
-
-        return transactions
+        return nil
     }
 
     var body: some View {
@@ -44,67 +25,114 @@ struct BalancingSummaryView: View {
                     .fontWeight(.bold)
                     .padding(.horizontal)
 
-                Text("Review your allocations before completing the balancing process.")
+                Text("Review the month-end allocation before completing.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .padding(.horizontal)
 
-                // Transactions to Create
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Transactions to Create (\(transactionsToCreate.count))")
-                        .font(.headline)
+                // Auto-Allocation Info
+                if let destination = destinationInfo {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Auto-Allocation")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        HStack {
+                            Image(
+                                systemName: destination.isDebt ? "creditcard" : "dollarsign.circle"
+                            )
+                            .font(.system(size: 50))
+                            .foregroundColor(destination.isDebt ? .orange : .green)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(destination.isDebt ? "Net Deficit" : "Net Savings")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                Text("$\(String(format: "%.2f", destination.amount))")
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(destination.isDebt ? .orange : .green)
+
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.right")
+                                        .font(.caption)
+                                    Text(destination.name)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(12)
                         .padding(.horizontal)
-
-                    ForEach(transactionsToCreate.indices, id: \.self) { index in
-                        let tx = transactionsToCreate[index]
-                        TransactionPreviewRow(
-                            number: index + 1,
-                            category: tx.category,
-                            destination: tx.destination,
-                            amount: tx.amount,
-                            isSurplus: tx.isSurplus
-                        )
                     }
-                }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(16)
-                .padding(.horizontal)
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                } else {
+                    // Perfectly balanced
+                    VStack(spacing: 16) {
+                        Image(systemName: "equal.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.blue)
 
-                // Warning
+                        Text("Perfectly Balanced")
+                            .font(.headline)
+
+                        Text("Your income matched your spending exactly this month.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                }
+
+                // Info
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                    Image(systemName: "info.circle.fill")
+                        .foregroundColor(.blue)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("This cannot be undone")
+                        Text("Automatic Allocation")
                             .font(.subheadline)
                             .fontWeight(.semibold)
 
-                        Text(
-                            "Once you complete balancing, these transactions will be created and Fund/Debt balances will be updated."
-                        )
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        if let destination = destinationInfo {
+                            if destination.isDebt {
+                                Text(
+                                    "This month's deficit will be automatically added to your \(destination.name) bucket. You can transfer funds later to pay it off."
+                                )
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            } else {
+                                Text(
+                                    "This month's savings will be automatically added to your \(destination.name) bucket. You can transfer it to other funds or debts later."
+                                )
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
+                        } else {
+                            Text(
+                                "No allocation needed this month since income matched spending."
+                            )
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding()
-                .background(Color.orange.opacity(0.1))
+                .background(Color.blue.opacity(0.1))
                 .cornerRadius(12)
                 .padding(.horizontal)
-
-                // Completion Info
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("All balances accounted for")
-                            .font(.headline)
-                            .foregroundColor(.green)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
 
                 Spacer()
             }
@@ -125,46 +153,5 @@ struct BalancingSummaryView: View {
             .padding()
             .background(Color(.systemBackground))
         }
-    }
-}
-
-struct TransactionPreviewRow: View {
-    let number: Int
-    let category: String
-    let destination: String
-    let amount: Double
-    let isSurplus: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(number).")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(width: 20, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 4) {
-                if isSurplus {
-                    Text("\(category) → \(destination)")
-                        .font(.body)
-                } else {
-                    Text("\(destination) → \(category)")
-                        .font(.body)
-                }
-
-                Text(isSurplus ? "Savings allocation" : "Deficit coverage")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Text("$\(String(format: "%.2f", amount))")
-                .font(.headline)
-                .foregroundColor(isSurplus ? .green : .orange)
-        }
-        .padding()
-        .background(Color(.tertiarySystemBackground))
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 }
