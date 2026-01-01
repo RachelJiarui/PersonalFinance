@@ -78,6 +78,32 @@ class TransactionStorageService: ObservableObject {
         }
     }
 
+    // MARK: - Month-End Balancing Helper Methods
+
+    /// Get all transactions for a specific month
+    func getTransactionsForMonth(year: Int, month: Int) -> [Transaction] {
+        let calendar = Calendar.current
+        return transactions.filter { transaction in
+            let txYear = calendar.component(.year, from: transaction.date)
+            let txMonth = calendar.component(.month, from: transaction.date)
+            return txYear == year && txMonth == month
+        }
+    }
+
+    /// Get total income for a specific month
+    func getTotalIncomeForMonth(year: Int, month: Int) -> Double {
+        return getTransactionsForMonth(year: year, month: month)
+            .filter { !$0.isExpense }
+            .reduce(0.0) { $0 + $1.amount }
+    }
+
+    /// Get total expenses for a specific month
+    func getTotalExpensesForMonth(year: Int, month: Int) -> Double {
+        return getTransactionsForMonth(year: year, month: month)
+            .filter { $0.isExpense }
+            .reduce(0.0) { $0 + $1.amount }
+    }
+
     // MARK: - Future Backend Integration (Stubs)
 
     // TODO: Implement when EC2 backend is ready

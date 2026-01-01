@@ -652,4 +652,21 @@ class BudgetService: ObservableObject {
             userIncome = decoded
         }
     }
+
+    // MARK: - Month-End Balancing Helper Methods
+
+    /// Get monthly take-home for a specific date (handles historical budget plans)
+    func getMonthlyTakeHomeForDate(_ date: Date) -> Double? {
+        // For now, use current income since we don't have historical plan fetching
+        // Future enhancement: fetch the budget plan that was active on this date from Firestore
+        guard let income = userIncome else { return nil }
+        return income.monthlyTakeHome
+    }
+
+    /// Get active categories for a specific date (handles historical budget plans)
+    func getActiveCategoriesForDate(_ date: Date) -> [BudgetCategory] {
+        // For now, return current active categories
+        // Future enhancement: fetch categories from the budget plan active on this date
+        return getActiveCategories()
+    }
 }

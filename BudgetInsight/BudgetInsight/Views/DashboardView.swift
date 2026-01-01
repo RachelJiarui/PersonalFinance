@@ -60,6 +60,39 @@ struct DashboardView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
 
+                    Divider()
+
+                    // Debug Section
+                    Menu {
+                        Button(action: {
+                            let calendar = Calendar.current
+                            let now = Date()
+                            let lastMonth = calendar.date(byAdding: .month, value: -1, to: now)!
+                            let year = calendar.component(.year, from: lastMonth)
+                            let month = calendar.component(.month, from: lastMonth)
+                            MonthEndBalancingService.shared.resetMonthBalancing(
+                                year: year, month: month)
+                        }) {
+                            Label(
+                                "Reset Last Month Balancing", systemImage: "arrow.counterclockwise")
+                        }
+
+                        Button(
+                            role: .destructive,
+                            action: {
+                                MonthEndBalancingService.shared.resetAllBalancing()
+                            }
+                        ) {
+                            Label(
+                                "Reset All Balancing History",
+                                systemImage: "exclamationmark.triangle")
+                        }
+                    } label: {
+                        Label("Debug Tools", systemImage: "hammer")
+                    }
+
+                    Divider()
+
                     Button(
                         role: .destructive,
                         action: {

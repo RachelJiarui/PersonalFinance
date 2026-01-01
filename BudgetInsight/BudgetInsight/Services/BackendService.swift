@@ -1059,6 +1059,70 @@ class BackendService: ObservableObject {
 
         return id
     }
+
+    // MARK: - User Registration
+
+    func registerUser(email: String) async throws -> String {
+        let url = URL(string: "\(baseURL)/users/register")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["email": email]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 201 || httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let userId = json["user_id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        // Mark as connected after successful registration
+        await MainActor.run {
+            self.isConnected = true
+        }
+
+        return userId
+    }
+
+    // MARK: - Month-End Balance API
+
+    func createMonthEndBalance(_ balance: MonthEndBalance) async throws -> String {
+        guard isConnected else {
+            throw BackendError.notConnected
+        }
+
+        let url = URL(string: "\(baseURL)/api/month-end-balances")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(balance)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 201
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        // Parse response to get Firestore-generated ID
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = json["id"] as? String
+        else {
+            throw BackendError.invalidData
+        }
+
+        return id
+    }
 }
 
 // MARK: - Errors

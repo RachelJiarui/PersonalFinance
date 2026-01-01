@@ -7,6 +7,7 @@ class AllocationService: ObservableObject {
 
     private let userDefaults = UserDefaults.standard
     private let allocationsKey = "transaction_allocations"
+    private let calendar = Calendar.current
 
     private init() {
         loadAllocations()
@@ -267,6 +268,41 @@ class AllocationService: ObservableObject {
         case .debt:
             return DebtService.shared.debts.contains(where: { $0.id == id })
         }
+    }
+
+    // MARK: - Month-End Balancing Helper Methods
+
+    /// Get all allocations for a specific month
+    func getAllocationsForMonth(year: Int, month: Int) -> [TransactionAllocation] {
+        let monthTransactions = TransactionStorageService.shared.getTransactionsForMonth(
+            year: year, month: month)
+        let transactionIds = Set(monthTransactions.map { $0.id })
+
+        return allocations.filter { transactionIds.contains($0.transactionId) }
+    }
+
+    /// Get category spending for a specific month
+    func getCategorySpendingForMonth(categoryId: String, year: Int, month: Int) -> Double {
+        let monthAllocations = getAllocationsForMonth(year: year, month: month)
+        let categoryAllocations = monthAllocations.filter {
+            $0.destinationType == .category && $0.destinationId == categoryId
+        }
+
+        var spending = 0.0
+        for allocation in categoryAllocations {
+            // Find transaction to determine if expense or income
+            if let tx = TransactionStorageService.shared.transactions.first(where: {
+                $0.id == allocation.transactionId
+            }) {
+                if tx.isExpense {
+                    spending += allocation.amount
+                } else {
+                    spending -= allocation.amount  // Reimbursement
+                }
+            }
+        }
+
+        return spending
     }
 
     // MARK: - Persistence
