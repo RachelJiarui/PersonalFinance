@@ -36,6 +36,7 @@
 		CCF192272EFF46E10053873B /* MyBudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192252EFF46E10053873B /* MyBudgetView.swift */; };
 		CCF192282EFF46E10053873B /* CircularProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */; };
 		CCF192292EFF46E10053873B /* DashboardCategoryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192202EFF46E10053873B /* DashboardCategoryCard.swift */; };
+		CCF19229TRNEW1 /* TransactionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF19220TRNEW1 /* TransactionRowView.swift */; };
 		CCF1922A2EFF46E10053873B /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192242EFF46E10053873B /* MainTabView.swift */; };
 		CCF1922B2EFF46E10053873B /* GraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192212EFF46E10053873B /* GraphView.swift */; };
 		CCF1922C2EFF46E10053873B /* GrandSchemeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192232EFF46E10053873B /* GrandSchemeView.swift */; };
@@ -85,6 +86,7 @@
 		CCF1921E2EFF46E10053873B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularProgressRing.swift; sourceTree = "<group>"; };
 		CCF192202EFF46E10053873B /* DashboardCategoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCategoryCard.swift; sourceTree = "<group>"; };
+		CCF19220TRNEW1 /* TransactionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionRowView.swift; sourceTree = "<group>"; };
 		CCF192212EFF46E10053873B /* GraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphView.swift; sourceTree = "<group>"; };
 		CCF192232EFF46E10053873B /* GrandSchemeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrandSchemeView.swift; sourceTree = "<group>"; };
 		CCF192242EFF46E10053873B /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -224,6 +226,7 @@
 				CCF1921E2EFF46E10053873B /* CalendarView.swift */,
 				CCF1921F2EFF46E10053873B /* CircularProgressRing.swift */,
 				CCF192202EFF46E10053873B /* DashboardCategoryCard.swift */,
+				CCF19220TRNEW1 /* TransactionRowView.swift */,
 				CCF192212EFF46E10053873B /* GraphView.swift */,
 			);
 			path = Components;
@@ -338,6 +341,7 @@
 				CCF2FC3B2F0640A300DC07DC /* MonthWrappedStats.swift in Sources */,
 				CCF2FC3C2F0640A300DC07DC /* BalancingDestination.swift in Sources */,
 				CCF192292EFF46E10053873B /* DashboardCategoryCard.swift in Sources */,
+				CCF19229TRNEW1 /* TransactionRowView.swift in Sources */,
 				CCF1922A2EFF46E10053873B /* MainTabView.swift in Sources */,
 				CCF1922B2EFF46E10053873B /* GraphView.swift in Sources */,
 				CCF1922C2EFF46E10053873B /* GrandSchemeView.swift in Sources */,

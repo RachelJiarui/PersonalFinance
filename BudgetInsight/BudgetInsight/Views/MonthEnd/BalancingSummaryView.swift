@@ -142,7 +142,7 @@ struct BalancingSummaryView: View {
             Button(action: onComplete) {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                    Text("Complete Balancing")
+                    Text("Complete Monthly Review & Rollover")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()

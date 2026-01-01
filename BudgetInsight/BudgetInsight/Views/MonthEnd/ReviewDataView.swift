@@ -36,6 +36,30 @@ struct ReviewDataView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    // Info Message
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(.blue)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Review & Edit")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+
+                            Text(
+                                "Tap any transaction to edit it. Changes will be reflected in your month summary."
+                            )
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+
                     // Summary Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Summary")
@@ -74,7 +98,7 @@ struct ReviewDataView: View {
                     // Transactions Section
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("All Transactions (\(monthTransactions.count))")
+                            Text("All Transactions")
                                 .font(.headline)
 
                             Spacer()
@@ -108,47 +132,21 @@ struct ReviewDataView: View {
                                         allocationService: allocationService
                                     )
                                 ) {
-                                    SimpleTransactionRow(transaction: transaction)
+                                    TransactionRowView(
+                                        transaction: transaction,
+                                        budgetService: budgetService,
+                                        allocationService: allocationService
+                                    )
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
                     }
-
-                    // Info Message
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.blue)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Review & Edit")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-
-                            Text(
-                                "Tap any transaction to edit it. Changes will be reflected in your month summary."
-                            )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                    .padding(.bottom)
                 }
                 .padding(.top)
             }
-            .navigationTitle("\(monthName) \(String(year)) Data")
+            .navigationTitle("\(monthName) \(String(year)) Transactions")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .sheet(isPresented: $showAddTransaction) {
                 RestrictedDateManualEntryView(year: year, month: month)
             }
@@ -448,53 +446,5 @@ struct RestrictedDateManualEntryView: View {
 
     private func showErrorAlert(_ message: String) {
         errorMessage = message
-    }
-}
-
-struct SimpleTransactionRow: View {
-    let transaction: Transaction
-
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: transaction.date)
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Icon
-            Image(
-                systemName: transaction.isExpense
-                    ? "arrow.up.circle.fill" : "arrow.down.circle.fill"
-            )
-            .font(.title2)
-            .foregroundColor(transaction.isExpense ? .red : .green)
-
-            // Details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.title)
-                    .font(.body)
-                    .lineLimit(2)
-
-                Text(formattedDate)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // Amount
-            Text(
-                transaction.isExpense
-                    ? "-$\(String(format: "%.2f", transaction.amount))"
-                    : "+$\(String(format: "%.2f", transaction.amount))"
-            )
-            .font(.headline)
-            .foregroundColor(transaction.isExpense ? .red : .green)
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-        .padding(.horizontal)
     }
 }

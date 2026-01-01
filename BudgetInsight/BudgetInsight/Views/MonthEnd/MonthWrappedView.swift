@@ -134,30 +134,16 @@ struct MonthWrappedView: View {
             .padding(.vertical)
         }
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 12) {
-                Button(action: onReviewData) {
-                    HStack {
-                        Image(systemName: "doc.text.magnifyingglass")
-                        Text("Review Data")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .foregroundColor(.primary)
-                    .cornerRadius(10)
+            Button(action: onReviewData) {
+                HStack {
+                    Text("Next")
+                    Image(systemName: "chevron.right")
                 }
-
-                Button(action: onNext) {
-                    HStack {
-                        Text("Next")
-                        Image(systemName: "arrow.right")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
             }
             .padding()
             .background(Color(.systemBackground))

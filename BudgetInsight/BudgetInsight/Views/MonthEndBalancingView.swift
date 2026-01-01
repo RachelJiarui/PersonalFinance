@@ -24,12 +24,15 @@ struct MonthEndBalancingView: View {
             ZStack {
                 if currentMonth != nil, let stats = viewModel.currentMonthStats {
                     VStack(spacing: 0) {
-                        // Progress Indicator
-                        ProgressView(
-                            value: Double(viewModel.currentStep),
-                            total: Double(viewModel.totalSteps - 1)
-                        )
-                        .padding()
+                        // Step Indicator
+                        HStack {
+                            Text("Step \(viewModel.currentStep + 1) of 3")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
 
                         // Step Content
                         TabView(selection: $viewModel.currentStep) {
@@ -81,19 +84,6 @@ struct MonthEndBalancingView: View {
                                 Text("Back")
                             }
                         }
-                    }
-                }
-
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        if !unbalancedMonths.isEmpty {
-                            Text(monthProgress)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Text(viewModel.progressText())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                 }
             }
@@ -164,7 +154,7 @@ struct ReviewDataStepView: View {
 
                 Button(action: onNext) {
                     HStack {
-                        Text("Continue to Summary")
+                        Text("Next")
                         Image(systemName: "chevron.right")
                     }
                     .frame(maxWidth: .infinity)
