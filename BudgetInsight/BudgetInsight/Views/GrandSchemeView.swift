@@ -335,7 +335,12 @@ struct TransactionDetailView: View {
 
     @StateObject private var fundService = FundService.shared
     @StateObject private var debtService = DebtService.shared
+    @StateObject private var transactionService = TransactionStorageService.shared
+    @StateObject private var backendService = BackendService.shared
     @State private var showEditSheet: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var isDeleting: Bool = false
+    @Environment(\.dismiss) var dismiss
 
     var allocations: [TransactionAllocation] {
         allocationService.allocations.filter { $0.transactionId == transaction.id }
@@ -407,6 +412,26 @@ struct TransactionDetailView: View {
                     }
                 }
                 .padding(.bottom)
+
+                // Delete Button
+                Button(
+                    role: .destructive,
+                    action: {
+                        showDeleteConfirmation = true
+                    }
+                ) {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "trash")
+                        Text("Delete Transaction")
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(10)
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
             }
             .padding(.vertical)
         }
@@ -426,6 +451,57 @@ struct TransactionDetailView: View {
                 originalTransaction: transaction,
                 originalAllocations: allocations
             )
+        }
+        .alert("Delete Transaction", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deleteTransaction()
+            }
+        } message: {
+            Text(
+                "Are you sure you want to delete '\(transaction.title)' for $\(String(format: "%.2f", transaction.amount))? This cannot be undone."
+            )
+        }
+    }
+
+    private func deleteTransaction() {
+        isDeleting = true
+
+        Task {
+            do {
+                // Delete from Firestore first
+                try await backendService.deleteTransaction(transaction.id)
+
+                await MainActor.run {
+                    // Delete allocations
+                    for allocation in allocations {
+                        allocationService.deleteAllocation(allocationId: allocation.id)
+                    }
+
+                    // Delete transaction from local storage
+                    transactionService.deleteTransaction(id: transaction.id)
+
+                    print(
+                        "✅ [TransactionDetail] Deleted transaction from Firestore and local: \(transaction.title)"
+                    )
+
+                    isDeleting = false
+                    // Dismiss the detail view
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ [TransactionDetail] Failed to delete from Firestore: \(error)")
+                    // Still delete locally even if Firestore fails
+                    for allocation in allocations {
+                        allocationService.deleteAllocation(allocationId: allocation.id)
+                    }
+                    transactionService.deleteTransaction(id: transaction.id)
+
+                    isDeleting = false
+                    dismiss()
+                }
+            }
         }
     }
 }

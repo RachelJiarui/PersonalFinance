@@ -8,8 +8,6 @@ struct ReviewDataView: View {
     @StateObject private var budgetService = BudgetService.shared
     @StateObject private var allocationService = AllocationService.shared
     @State private var showAddTransaction = false
-    @State private var transactionToDelete: Transaction?
-    @State private var showDeleteConfirmation = false
 
     private var monthTransactions: [Transaction] {
         transactionService.getTransactionsForMonth(year: year, month: month)
@@ -113,14 +111,6 @@ struct ReviewDataView: View {
                                     SimpleTransactionRow(transaction: transaction)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        transactionToDelete = transaction
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
                             }
                         }
                     }
@@ -162,36 +152,7 @@ struct ReviewDataView: View {
             .sheet(isPresented: $showAddTransaction) {
                 RestrictedDateManualEntryView(year: year, month: month)
             }
-            .alert("Delete Transaction", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    if let transaction = transactionToDelete {
-                        deleteTransaction(transaction)
-                    }
-                }
-            } message: {
-                if let transaction = transactionToDelete {
-                    Text(
-                        "Are you sure you want to delete '\(transaction.title)' for $\(String(format: "%.2f", transaction.amount))? This cannot be undone."
-                    )
-                }
-            }
         }
-    }
-
-    private func deleteTransaction(_ transaction: Transaction) {
-        // Delete allocations first
-        let allocations = allocationService.allocations.filter {
-            $0.transactionId == transaction.id
-        }
-        for allocation in allocations {
-            allocationService.deleteAllocation(allocationId: allocation.id)
-        }
-
-        // Delete transaction
-        transactionService.deleteTransaction(id: transaction.id)
-
-        print("✅ [ReviewData] Deleted transaction: \(transaction.title)")
     }
 }
 
