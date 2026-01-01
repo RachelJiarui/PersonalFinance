@@ -7,20 +7,34 @@ struct PeriodSnapshot: Identifiable, Codable, Equatable {
 
     // Financial data
     let monthlyTakeHome: Double  // From UserIncome at the time
-    let totalSpending: Double    // Sum of all transactions for this period
-    let savings: Double          // takeHome - spending
+    let totalSpending: Double  // Sum of all transactions for this period
+    let savings: Double  // takeHome - spending
+
+    // Budget plan reference - preserves historical budget context
+    let budgetPlanId: String  // References BudgetPlan that was active when this snapshot was created
 
     // Metadata
     let createdAt: Date
     let transactionCount: Int
 
-    init(id: UUID = UUID(), year: Int, month: Int? = nil, monthlyTakeHome: Double, totalSpending: Double, savings: Double, createdAt: Date = Date(), transactionCount: Int) {
+    init(
+        id: UUID = UUID(),
+        year: Int,
+        month: Int? = nil,
+        monthlyTakeHome: Double,
+        totalSpending: Double,
+        savings: Double,
+        budgetPlanId: String,
+        createdAt: Date = Date(),
+        transactionCount: Int
+    ) {
         self.id = id
         self.year = year
         self.month = month
         self.monthlyTakeHome = monthlyTakeHome
         self.totalSpending = totalSpending
         self.savings = savings
+        self.budgetPlanId = budgetPlanId
         self.createdAt = createdAt
         self.transactionCount = transactionCount
     }

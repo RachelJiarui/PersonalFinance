@@ -227,6 +227,55 @@ def delete_budget_plan(plan_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/budget-plans/<plan_id>", methods=["GET"])
+def get_budget_plan(plan_id):
+    """Get a specific budget plan by ID"""
+    try:
+        plan = db.get_budget_plan(plan_id)
+        if not plan:
+            return jsonify({"error": "Budget plan not found"}), 404
+        return jsonify(plan), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/budget-plans/<plan_id>/supersede", methods=["PUT"])
+def supersede_budget_plan(plan_id):
+    """Mark a budget plan as superseded by a new plan"""
+    try:
+        data = request.get_json()
+        new_plan_id = data.get("new_plan_id")
+        end_date_str = data.get("end_date")
+
+        if not new_plan_id or not end_date_str:
+            return jsonify({"error": "Missing new_plan_id or end_date"}), 400
+
+        # Parse ISO8601 date string
+        end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+        db.supersede_budget_plan(plan_id, new_plan_id, end_date)
+
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/budget-plans/active-on/<date_str>", methods=["GET"])
+def get_budget_plan_for_date(date_str):
+    """Get the budget plan that was active on a specific date (ISO8601 format)"""
+    try:
+        # Parse ISO8601 date string
+        target_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        year = target_date.year
+
+        plan = db.get_active_budget_plan_for_date(year, target_date)
+        if not plan:
+            return jsonify({"error": "No budget plan found for date"}), 404
+
+        return jsonify(plan), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================================================
 # USER INCOME
 # ============================================================================

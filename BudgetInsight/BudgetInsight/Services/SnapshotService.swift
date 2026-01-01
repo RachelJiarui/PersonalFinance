@@ -21,7 +21,8 @@ class SnapshotService: ObservableObject {
         year: Int,
         month: Int,
         monthlyTakeHome: Double,
-        transactions: [Transaction]
+        transactions: [Transaction],
+        budgetPlanId: String
     ) {
         let calendar = Calendar.current
 
@@ -41,6 +42,7 @@ class SnapshotService: ObservableObject {
             monthlyTakeHome: monthlyTakeHome,
             totalSpending: totalSpending,
             savings: savings,
+            budgetPlanId: budgetPlanId,
             createdAt: Date(),
             transactionCount: monthTransactions.count
         )
@@ -62,7 +64,8 @@ class SnapshotService: ObservableObject {
     func createYearlySnapshot(
         year: Int,
         monthlyTakeHome: Double,
-        transactions: [Transaction]
+        transactions: [Transaction],
+        budgetPlanId: String
     ) {
         let annualTakeHome = monthlyTakeHome * 12.0
 
@@ -83,6 +86,7 @@ class SnapshotService: ObservableObject {
             monthlyTakeHome: annualTakeHome,
             totalSpending: totalSpending,
             savings: savings,
+            budgetPlanId: budgetPlanId,
             createdAt: Date(),
             transactionCount: yearTransactions.count
         )
@@ -110,19 +114,27 @@ class SnapshotService: ObservableObject {
         let currentYear = calendar.component(.year, from: now)
         let currentMonth = calendar.component(.month, from: now)
 
+        // Get the current active budget plan ID
+        guard let currentPlan = BudgetService.shared.budgetPlan else {
+            print("⚠️ [SnapshotService] No active budget plan found, cannot create snapshots")
+            return
+        }
+
         // Create/update snapshot for current month
         createMonthlySnapshot(
             year: currentYear,
             month: currentMonth,
             monthlyTakeHome: monthlyTakeHome,
-            transactions: transactions
+            transactions: transactions,
+            budgetPlanId: currentPlan.id
         )
 
         // Create/update snapshot for current year
         createYearlySnapshot(
             year: currentYear,
             monthlyTakeHome: monthlyTakeHome,
-            transactions: transactions
+            transactions: transactions,
+            budgetPlanId: currentPlan.id
         )
     }
 
@@ -174,6 +186,27 @@ class SnapshotService: ObservableObject {
             return yearlySnapshots.sorted { $0.year > $1.year }
         }
         return yearlySnapshots
+    }
+
+    /// Fetch a snapshot with its associated budget plan for historical viewing
+    func getSnapshotWithBudgetPlan(year: Int, month: Int) async -> (PeriodSnapshot, BudgetPlan)? {
+        guard let snapshot = monthlySnapshots.first(where: { $0.year == year && $0.month == month })
+        else {
+            return nil
+        }
+
+        // Fetch the budget plan that was active for this snapshot
+        do {
+            if let budgetPlan = try await BackendService.shared.fetchBudgetPlan(
+                planId: snapshot.budgetPlanId)
+            {
+                return (snapshot, budgetPlan)
+            }
+        } catch {
+            print("❌ [SnapshotService] Error fetching budget plan for snapshot: \(error)")
+        }
+
+        return nil
     }
 
     // MARK: - Persistence

@@ -303,14 +303,13 @@ class BudgetService: ObservableObject {
     func deleteCategory(categoryId: String) {
         // Mark as inactive instead of deleting (for historical data integrity)
         if let index = budgetCategories.firstIndex(where: { $0.id == categoryId }) {
+            let categoryName = budgetCategories[index].name
             budgetCategories[index].isActive = false
             saveBudgetCategories()
 
-            // Remove from budget plan's active categories
-            if var plan = budgetPlan {
-                plan.categoryIds.removeAll { $0 == categoryId }
-                budgetPlan = plan
-                saveBudgetPlan()
+            // Remove from budget plan's active categories by creating a new version
+            if let plan = budgetPlan {
+                let updatedCategoryIds = plan.categoryIds.filter { $0 != categoryId }
 
                 // Update both in Firestore
                 Task {
@@ -319,8 +318,11 @@ class BudgetService: ObservableObject {
                         try await BackendService.shared.deleteBudgetCategory(categoryId)
                         print("✅ [BudgetService] Marked category as inactive in Firestore")
 
-                        // Update BudgetPlan in Firestore
-                        try await self.saveBudgetPlanToFirestore(plan)
+                        // Create new budget plan version with updated categories
+                        await createBudgetPlanVersion(
+                            reason: "Removed category: \(categoryName)",
+                            categoryChanges: updatedCategoryIds
+                        )
                     } catch {
                         print("❌ [BudgetService] Error deleting category: \(error)")
                     }
@@ -340,35 +342,32 @@ class BudgetService: ObservableObject {
     // MARK: - Budget Plan Management
 
     func updateBudgetPlanIncome(income: UserIncome) {
-        if let plan = budgetPlan, plan.year == income.year {
-            // Update existing plan
-            let updatedPlan = BudgetPlan(
-                id: plan.id,
-                year: plan.year,
-                annualSalaryGross: income.annualSalary,
-                userIncomeId: income.id,
-                categoryIds: plan.categoryIds
-            )
-            budgetPlan = updatedPlan
-            saveBudgetPlan()
+        let currentYear = Calendar.current.component(.year, from: Date())
 
-            // Save update to Firestore
+        if let plan = budgetPlan, plan.year == currentYear {
+            // Mid-year change - create new version
             Task {
-                do {
-                    try await self.saveBudgetPlanToFirestore(updatedPlan)
-                } catch {
-                    print("❌ [BudgetService] Error updating BudgetPlan in Firestore: \(error)")
-                }
+                await createBudgetPlanVersion(
+                    reason: "Income updated",
+                    annualSalary: income.annualSalary,
+                    userIncomeId: income.id
+                )
             }
         } else {
-            // Create new plan for current year
+            // New year - create first version for the year
             let activeCategoryIds = getActiveCategories().filter { !$0.id.isEmpty }.map { $0.id }
             let newPlan = BudgetPlan(
                 id: "",  // Firestore will generate this
                 year: income.year,
                 annualSalaryGross: income.annualSalary,
                 userIncomeId: income.id,
-                categoryIds: activeCategoryIds
+                categoryIds: activeCategoryIds,
+                isActive: true,
+                effectiveDate: Date(),
+                endDate: nil,
+                versionNumber: 1,
+                changeReason: "Initial plan for \(income.year)",
+                supersededByPlanId: nil
             )
             budgetPlan = newPlan
             saveBudgetPlan()
@@ -390,6 +389,68 @@ class BudgetService: ObservableObject {
                     print("❌ [BudgetService] Error creating BudgetPlan in Firestore: \(error)")
                 }
             }
+        }
+    }
+
+    func createBudgetPlanVersion(
+        reason: String,
+        annualSalary: Double? = nil,
+        userIncomeId: String? = nil,
+        categoryChanges: [String]? = nil
+    ) async {
+        guard let currentPlan = budgetPlan else { return }
+
+        let now = Date()
+        let currentYear = Calendar.current.component(.year, from: now)
+
+        // Only create version if changing within same year
+        guard currentPlan.year == currentYear else {
+            print("⚠️ [BudgetService] Cannot version plan from different year")
+            return
+        }
+
+        // Determine new values
+        let newAnnualSalary = annualSalary ?? currentPlan.annualSalaryGross
+        let newUserIncomeId = userIncomeId ?? currentPlan.userIncomeId
+        let newCategoryIds = categoryChanges ?? currentPlan.categoryIds
+
+        // Create new BudgetPlan version
+        let newPlan = BudgetPlan(
+            id: "",
+            year: currentYear,
+            annualSalaryGross: newAnnualSalary,
+            userIncomeId: newUserIncomeId,
+            categoryIds: newCategoryIds,
+            isActive: true,
+            effectiveDate: now,
+            endDate: nil,
+            versionNumber: currentPlan.versionNumber + 1,
+            changeReason: reason,
+            supersededByPlanId: nil
+        )
+
+        do {
+            // Save new plan to Firestore
+            let newPlanId = try await BackendService.shared.createBudgetPlan(newPlan)
+            print("✅ [BudgetService] Created budget plan version \(newPlan.versionNumber)")
+
+            // Mark old plan as superseded
+            try await BackendService.shared.supersedeBudgetPlan(
+                oldPlanId: currentPlan.id,
+                newPlanId: newPlanId,
+                endDate: now
+            )
+            print("✅ [BudgetService] Marked old plan as superseded")
+
+            // Update local state
+            await MainActor.run {
+                var savedPlan = newPlan
+                savedPlan.id = newPlanId
+                self.budgetPlan = savedPlan
+                self.saveBudgetPlan()
+            }
+        } catch {
+            print("❌ [BudgetService] Error creating budget plan version: \(error)")
         }
     }
 

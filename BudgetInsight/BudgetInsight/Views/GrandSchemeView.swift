@@ -13,37 +13,39 @@ struct GrandSchemeView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Top toolbar with tab buttons
-            HStack(spacing: 12) {
-                TabButton(
-                    title: "All Transactions",
-                    isSelected: selectedTab == .allTransactions,
-                    action: { selectedTab = .allTransactions }
-                )
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Tab buttons
+                HStack(spacing: 12) {
+                    TabButton(
+                        title: "All Transactions",
+                        isSelected: selectedTab == .allTransactions,
+                        action: { selectedTab = .allTransactions }
+                    )
 
-                TabButton(
-                    title: "Expenditures Overview",
-                    isSelected: selectedTab == .expenditureOverview,
-                    action: { selectedTab = .expenditureOverview }
-                )
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 12)
-            .background(Color(.systemBackground))
+                    TabButton(
+                        title: "Expenditures Overview",
+                        isSelected: selectedTab == .expenditureOverview,
+                        action: { selectedTab = .expenditureOverview }
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(Color(.systemBackground))
 
-            Divider()
+                Divider()
 
-            // Content based on selected tab
-            if selectedTab == .allTransactions {
-                AllTransactionsView(
-                    transactions: transactionService.transactions,
-                    budgetService: budgetService,
-                    allocationService: allocationService
-                )
-            } else {
-                ExpenditureOverviewView()
-                    .environmentObject(viewModel)
+                // Content based on selected tab
+                if selectedTab == .allTransactions {
+                    AllTransactionsView(
+                        transactions: transactionService.transactions,
+                        budgetService: budgetService,
+                        allocationService: allocationService
+                    )
+                } else {
+                    ExpenditureOverviewView()
+                        .environmentObject(viewModel)
+                }
             }
         }
         .navigationTitle("Grand Scheme")

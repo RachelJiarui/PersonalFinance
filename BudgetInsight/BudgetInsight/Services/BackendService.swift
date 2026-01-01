@@ -276,17 +276,39 @@ class BackendService: ObservableObject {
             let year = dict["year"] as? Int,
             let annualSalaryGross = dict["annual_salary_gross"] as? Double,
             let userIncomeId = dict["user_income_id"] as? String,
-            let categoryIds = dict["category_ids"] as? [String]
+            let categoryIds = dict["category_ids"] as? [String],
+            let isActive = dict["is_active"] as? Bool,
+            let effectiveDateString = dict["effective_date"] as? String,
+            let versionNumber = dict["version_number"] as? Int
         else {
             throw BackendError.invalidData
         }
+
+        let dateFormatter = ISO8601DateFormatter()
+        guard let effectiveDate = dateFormatter.date(from: effectiveDateString) else {
+            throw BackendError.invalidData
+        }
+
+        var endDate: Date?
+        if let endDateString = dict["end_date"] as? String {
+            endDate = dateFormatter.date(from: endDateString)
+        }
+
+        let changeReason = dict["change_reason"] as? String
+        let supersededByPlanId = dict["superseded_by_plan_id"] as? String
 
         return BudgetPlan(
             id: id,
             year: year,
             annualSalaryGross: annualSalaryGross,
             userIncomeId: userIncomeId,
-            categoryIds: categoryIds
+            categoryIds: categoryIds,
+            isActive: isActive,
+            effectiveDate: effectiveDate,
+            endDate: endDate,
+            versionNumber: versionNumber,
+            changeReason: changeReason,
+            supersededByPlanId: supersededByPlanId
         )
     }
 
@@ -296,12 +318,28 @@ class BackendService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        let dateFormatter = ISO8601DateFormatter()
+
+        var body: [String: Any] = [
             "year": plan.year,
             "annual_salary_gross": plan.annualSalaryGross,
             "user_income_id": plan.userIncomeId,
             "category_ids": plan.categoryIds,
+            "is_active": plan.isActive,
+            "effective_date": dateFormatter.string(from: plan.effectiveDate),
+            "version_number": plan.versionNumber,
         ]
+
+        // Add optional fields
+        if let endDate = plan.endDate {
+            body["end_date"] = dateFormatter.string(from: endDate)
+        }
+        if let changeReason = plan.changeReason {
+            body["change_reason"] = changeReason
+        }
+        if let supersededByPlanId = plan.supersededByPlanId {
+            body["superseded_by_plan_id"] = supersededByPlanId
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -329,6 +367,86 @@ class BackendService: ObservableObject {
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+
+    func fetchBudgetPlan(planId: String) async throws -> BudgetPlan? {
+        let url = URL(string: "\(baseURL)/budget-plans/\(planId)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 404 {
+            return nil
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw BackendError.invalidResponse
+        }
+
+        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let id = dict["id"] as? String,
+            let year = dict["year"] as? Int,
+            let annualSalaryGross = dict["annual_salary_gross"] as? Double,
+            let userIncomeId = dict["user_income_id"] as? String,
+            let categoryIds = dict["category_ids"] as? [String],
+            let isActive = dict["is_active"] as? Bool,
+            let effectiveDateString = dict["effective_date"] as? String,
+            let versionNumber = dict["version_number"] as? Int
+        else {
+            throw BackendError.invalidData
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        guard let effectiveDate = dateFormatter.date(from: effectiveDateString) else {
+            throw BackendError.invalidData
+        }
+
+        var endDate: Date?
+        if let endDateString = dict["end_date"] as? String {
+            endDate = dateFormatter.date(from: endDateString)
+        }
+
+        let changeReason = dict["change_reason"] as? String
+        let supersededByPlanId = dict["superseded_by_plan_id"] as? String
+
+        return BudgetPlan(
+            id: id,
+            year: year,
+            annualSalaryGross: annualSalaryGross,
+            userIncomeId: userIncomeId,
+            categoryIds: categoryIds,
+            isActive: isActive,
+            effectiveDate: effectiveDate,
+            endDate: endDate,
+            versionNumber: versionNumber,
+            changeReason: changeReason,
+            supersededByPlanId: supersededByPlanId
+        )
+    }
+
+    func supersedeBudgetPlan(oldPlanId: String, newPlanId: String, endDate: Date) async throws {
+        let url = URL(string: "\(baseURL)/budget-plans/\(oldPlanId)/supersede")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let dateFormatter = ISO8601DateFormatter()
+        let body: [String: Any] = [
+            "new_plan_id": newPlanId,
+            "end_date": dateFormatter.string(from: endDate),
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -876,6 +994,7 @@ class BackendService: ObservableObject {
                 let monthlyTakeHome = dict["monthly_take_home"] as? Double,
                 let totalSpending = dict["total_spending"] as? Double,
                 let savings = dict["savings"] as? Double,
+                let budgetPlanId = dict["budget_plan_id"] as? String,
                 let transactionCount = dict["transaction_count"] as? Int,
                 let createdAtString = dict["created_at"] as? String,
                 let createdAt = dateFormatter.date(from: createdAtString)
@@ -890,6 +1009,7 @@ class BackendService: ObservableObject {
                     monthlyTakeHome: monthlyTakeHome,
                     totalSpending: totalSpending,
                     savings: savings,
+                    budgetPlanId: budgetPlanId,
                     createdAt: createdAt,
                     transactionCount: transactionCount
                 )

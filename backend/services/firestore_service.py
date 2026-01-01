@@ -223,7 +223,7 @@ class FirestoreService:
 
     def create_budget_plan(self, plan_data: Dict) -> str:
         """
-        Create a budget plan
+        Create a budget plan with versioning support
 
         Expected fields:
         - id: str (UUID)
@@ -231,9 +231,33 @@ class FirestoreService:
         - annual_salary_gross: float
         - user_income_id: str (UUID linking to UserIncome)
         - category_ids: [str] (list of active BudgetCategory UUIDs)
+
+        Versioning fields:
+        - is_active: bool (default True)
+        - effective_date: str (ISO8601, defaults to now)
+        - end_date: str | null
+        - version_number: int
+        - change_reason: str | null
+        - superseded_by_plan_id: str | null
         """
         plan_data["created_at"] = firestore.SERVER_TIMESTAMP
         plan_data["updated_at"] = firestore.SERVER_TIMESTAMP
+
+        # Set versioning defaults
+        plan_data["is_active"] = plan_data.get("is_active", True)
+
+        if "effective_date" not in plan_data:
+            plan_data["effective_date"] = datetime.now().isoformat()
+
+        plan_data.setdefault("end_date", None)
+        plan_data.setdefault("change_reason", None)
+        plan_data.setdefault("superseded_by_plan_id", None)
+
+        # Calculate version number if not provided (find highest version for this year + 1)
+        if "version_number" not in plan_data:
+            year = plan_data["year"]
+            existing_plans = self.get_budget_plans(year=year)
+            plan_data["version_number"] = len(existing_plans) + 1
 
         # Remove id if present - let Firestore generate it
         plan_data.pop("id", None)
@@ -250,6 +274,55 @@ class FirestoreService:
     def delete_budget_plan(self, plan_id: str):
         """Delete a budget plan"""
         self.db.collection("budget_plans").document(plan_id).delete()
+
+    def supersede_budget_plan(
+        self, old_plan_id: str, new_plan_id: str, end_date: datetime
+    ):
+        """
+        Mark an old budget plan as superseded by a new one
+
+        Args:
+            old_plan_id: ID of the plan being superseded
+            new_plan_id: ID of the new plan that replaces it
+            end_date: When the old plan stopped being active
+        """
+        self.db.collection("budget_plans").document(old_plan_id).update(
+            {
+                "is_active": False,
+                "end_date": end_date.isoformat(),
+                "superseded_by_plan_id": new_plan_id,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+    def get_active_budget_plan_for_date(
+        self, year: int, target_date: datetime
+    ) -> Optional[Dict]:
+        """
+        Get the budget plan that was active on a specific date
+
+        Args:
+            year: The year to search in
+            target_date: The date to check
+
+        Returns:
+            The budget plan that was active on that date, or None
+        """
+        plans = self.get_budget_plans(year=year)
+
+        for plan in plans:
+            effective = datetime.fromisoformat(plan["effective_date"])
+            end = (
+                datetime.fromisoformat(plan["end_date"])
+                if plan.get("end_date")
+                else None
+            )
+
+            # Check if target_date falls within this plan's active period
+            if effective <= target_date and (end is None or target_date < end):
+                return plan
+
+        return None
 
     # ========================================================================
     # USER INCOME
