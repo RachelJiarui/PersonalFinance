@@ -172,8 +172,14 @@ class AllocationService: ObservableObject {
     }
 
     func deleteAllocation(allocationId: String) {
+        print("🔍 [AllocationService] Attempting to delete allocation: \(allocationId)")
+
         if let index = allocations.firstIndex(where: { $0.id == allocationId }) {
             let allocation = allocations[index]
+
+            print(
+                "🔍 [AllocationService] Found allocation: type=\(allocation.destinationType), amount=$\(allocation.amount)"
+            )
 
             // Get transaction type
             let transaction = TransactionStorageService.shared.transactions.first {
@@ -181,7 +187,14 @@ class AllocationService: ObservableObject {
             }
             let isExpense = transaction?.isExpense ?? true
 
+            print(
+                "🔍 [AllocationService] Transaction found: \(transaction != nil), isExpense: \(isExpense)"
+            )
+
             // Reverse the balance change
+            print(
+                "🔍 [AllocationService] Reversing balance: type=\(allocation.destinationType), amount=-\(allocation.amount)"
+            )
             updateDestinationBalance(
                 destinationType: allocation.destinationType,
                 destinationId: allocation.destinationId,
@@ -192,6 +205,8 @@ class AllocationService: ObservableObject {
             allocations.remove(at: index)
             saveAllocations()
 
+            print("✅ [AllocationService] Deleted allocation locally and reversed balance")
+
             // Delete from Firestore
             Task {
                 do {
@@ -201,6 +216,8 @@ class AllocationService: ObservableObject {
                     print("❌ [AllocationService] Error deleting Allocation: \(error)")
                 }
             }
+        } else {
+            print("⚠️ [AllocationService] Allocation not found: \(allocationId)")
         }
     }
 

@@ -279,22 +279,22 @@ struct ManualEntryView: View {
                 // Update category spending (instant UI update)
                 await MainActor.run {
                     budgetService.updateCategorySpending(with: storageService.transactions)
-
-                    // Update snapshots
-                    if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
-                        SnapshotService.shared.updateSnapshotsIfNeeded(
-                            monthlyTakeHome: monthlyTakeHome,
-                            transactions: storageService.transactions
-                        )
-                    }
-
-                    print(
-                        "✅ [ManualEntry] Saved transaction to Firestore: \(title) - $\(amountValue) (ID: \(firestoreId))"
-                    )
-
-                    isSaving = false
-                    dismiss()
                 }
+
+                // Update snapshots
+                if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+                    await SnapshotService.shared.updateSnapshotsIfNeeded(
+                        monthlyTakeHome: monthlyTakeHome,
+                        transactions: storageService.transactions
+                    )
+                }
+
+                print(
+                    "✅ [ManualEntry] Saved transaction to Firestore: \(title) - $\(amountValue) (ID: \(firestoreId))"
+                )
+
+                isSaving = false
+                dismiss()
             } catch {
                 await MainActor.run {
                     isSaving = false

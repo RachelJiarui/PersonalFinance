@@ -342,15 +342,17 @@ struct EditTransactionView: View {
 
                     // Update category spending (instant UI update)
                     budgetService.updateCategorySpending(with: storageService.transactions)
+                }
 
-                    // Update snapshots
-                    if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
-                        SnapshotService.shared.updateSnapshotsIfNeeded(
-                            monthlyTakeHome: monthlyTakeHome,
-                            transactions: storageService.transactions
-                        )
-                    }
+                // Update snapshots
+                if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+                    await SnapshotService.shared.updateSnapshotsIfNeeded(
+                        monthlyTakeHome: monthlyTakeHome,
+                        transactions: storageService.transactions
+                    )
+                }
 
+                await MainActor.run {
                     print(
                         "✅ [EditTransaction] Updated transaction in Firestore: \(title) - $\(amountValue) (ID: \(originalTransaction.id))"
                     )

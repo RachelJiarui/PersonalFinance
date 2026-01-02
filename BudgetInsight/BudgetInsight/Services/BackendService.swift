@@ -1038,6 +1038,7 @@ class BackendService: ObservableObject {
             "monthly_take_home": snapshot.monthlyTakeHome,
             "total_spending": snapshot.totalSpending,
             "savings": snapshot.savings,
+            "budget_plan_id": snapshot.budgetPlanId,
             "transaction_count": snapshot.transactionCount,
             "created_at": dateFormatter.string(from: snapshot.createdAt),
         ]

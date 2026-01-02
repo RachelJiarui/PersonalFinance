@@ -63,7 +63,7 @@ class DashboardViewModel: ObservableObject {
 
             // Update snapshots for historical tracking
             if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
-                snapshotService.updateSnapshotsIfNeeded(
+                await snapshotService.updateSnapshotsIfNeeded(
                     monthlyTakeHome: monthlyTakeHome,
                     transactions: storageService.transactions
                 )
@@ -191,12 +191,14 @@ class DashboardViewModel: ObservableObject {
         // Update category spending with current transactions (synchronous, instant)
         budgetService.updateCategorySpending(with: storageService.transactions)
 
-        // Update snapshots for historical tracking
+        // Update snapshots for historical tracking (async in background)
         if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
-            snapshotService.updateSnapshotsIfNeeded(
-                monthlyTakeHome: monthlyTakeHome,
-                transactions: storageService.transactions
-            )
+            Task {
+                await snapshotService.updateSnapshotsIfNeeded(
+                    monthlyTakeHome: monthlyTakeHome,
+                    transactions: storageService.transactions
+                )
+            }
         }
 
         print("✅ [DashboardViewModel] Synchronous update complete")

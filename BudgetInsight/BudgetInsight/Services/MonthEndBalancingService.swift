@@ -94,6 +94,85 @@ class MonthEndBalancingService: ObservableObject {
     /// Reset balancing status for a specific month (for testing)
     func resetMonthBalancing(year: Int, month: Int) {
         let key = "balanced_\(year)_\(month)"
+
+        // First, find and delete all month-end balancing transactions for this month
+        let transactionService = TransactionStorageService.shared
+        let allocationService = AllocationService.shared
+        let backendService = BackendService.shared
+
+        // Find all transactions created on the last day of this month with "Month-End:" prefix
+        let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
+        let calendar = Calendar.current
+
+        print("🔍 [BalancingService] Looking for balancing transactions in month \(month)/\(year)")
+        print(
+            "🔍 [BalancingService] Total transactions in system: \(transactionService.transactions.count)"
+        )
+
+        let balancingTransactions = transactionService.transactions.filter { transaction in
+            let txYear = calendar.component(.year, from: transaction.date)
+            let txMonth = calendar.component(.month, from: transaction.date)
+            let txDay = calendar.component(.day, from: transaction.date)
+
+            print(
+                "🔍 [BalancingService] Checking: '\(transaction.title)' date: \(txMonth)/\(txYear)")
+
+            // Check if it's from this month and has "Month-End:" prefix
+            let matches =
+                txYear == year && txMonth == month && transaction.title.hasPrefix("Month-End:")
+
+            if matches {
+                print("✅ [BalancingService] MATCH FOUND: '\(transaction.title)'")
+            }
+
+            return matches
+        }
+
+        print(
+            "🔄 [BalancingService] Found \(balancingTransactions.count) month-end transactions to delete"
+        )
+
+        if balancingTransactions.isEmpty {
+            print("⚠️ [BalancingService] NO balancing transactions found to delete!")
+        }
+
+        // Delete transactions and their allocations
+        // IMPORTANT: Delete allocations FIRST so they can properly reverse fund/debt balances
+        // while the transaction still exists to get isExpense info
+        for transaction in balancingTransactions {
+            // Delete allocations for this transaction (this reverses fund/debt balances)
+            let allocations = allocationService.allocations.filter {
+                $0.transactionId == transaction.id
+            }
+            for allocation in allocations {
+                allocationService.deleteAllocation(allocationId: allocation.id)
+                print(
+                    "🔄 [BalancingService] Deleted allocation and reversed balance for: \(transaction.title)"
+                )
+            }
+        }
+
+        // Now delete the transactions after allocations have been processed
+        for transaction in balancingTransactions {
+            // Delete transaction locally
+            transactionService.deleteTransaction(id: transaction.id)
+
+            // Delete from Firestore asynchronously
+            Task {
+                do {
+                    try await backendService.deleteTransaction(transaction.id)
+                    print(
+                        "✅ [BalancingService] Deleted transaction from Firestore: \(transaction.title)"
+                    )
+                } catch {
+                    print(
+                        "⚠️ [BalancingService] Failed to delete transaction from Firestore: \(error)"
+                    )
+                }
+            }
+        }
+
+        // Remove the balanced flag
         userDefaults.removeObject(forKey: key)
         print("🔄 [BalancingService] Reset balancing for \(monthName(month)) \(year)")
 
@@ -130,25 +209,59 @@ class MonthEndBalancingService: ObservableObject {
         userDefaults.set(true, forKey: key)
 
         print("✅ [BalancingService] Marked \(monthName(month)) \(year) as balanced")
+        print("🔍 [BalancingService] About to create snapshot...")
 
-        // Create snapshot for this month
-        let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
-        if let monthlyTakeHome = BudgetService.shared.getMonthlyTakeHomeForDate(lastDayOfMonth),
-            let budgetPlan = BudgetService.shared.budgetPlan
-        {
-            let allTransactions = TransactionStorageService.shared.transactions
-            SnapshotService.shared.createMonthlySnapshot(
-                year: year,
-                month: month,
-                monthlyTakeHome: monthlyTakeHome,
-                transactions: allTransactions,
-                budgetPlanId: budgetPlan.id
-            )
-            print("📊 [BalancingService] Created snapshot for \(monthName(month)) \(year)")
-        }
-
-        // Also save to Firestore
+        // Create snapshot and save to Firestore
         Task {
+            print("🔍 [BalancingService] Inside Task block for snapshot creation")
+
+            // Create snapshot for this month
+            let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
+            let monthlyTakeHome = BudgetService.shared.getMonthlyTakeHomeForDate(lastDayOfMonth)
+            var budgetPlan = BudgetService.shared.budgetPlan
+
+            print(
+                "🔍 [BalancingService] monthlyTakeHome: \(monthlyTakeHome != nil ? String(monthlyTakeHome!) : "NIL")"
+            )
+            print(
+                "🔍 [BalancingService] budgetPlan (local): \(budgetPlan != nil ? "EXISTS" : "NIL")")
+
+            // If budgetPlan is nil, try fetching from Firestore
+            if budgetPlan == nil {
+                print("🔍 [BalancingService] Fetching budget plan from Firestore...")
+                do {
+                    budgetPlan = try await BackendService.shared.fetchActiveBudgetPlan()
+
+                    if let plan = budgetPlan {
+                        print(
+                            "✅ [BalancingService] Fetched budget plan from Firestore (ID: \(plan.id), year: \(plan.year))"
+                        )
+                    } else {
+                        print("⚠️ [BalancingService] No active budget plan found in Firestore")
+                    }
+                } catch {
+                    print("❌ [BalancingService] Error fetching budget plan: \(error)")
+                }
+            }
+
+            if let monthlyTakeHome = monthlyTakeHome,
+                let budgetPlan = budgetPlan
+            {
+                print("🔍 [BalancingService] All conditions met, creating snapshot...")
+                let allTransactions = TransactionStorageService.shared.transactions
+                print("🔍 [BalancingService] Total transactions: \(allTransactions.count)")
+
+                await SnapshotService.shared.createMonthlySnapshot(
+                    year: year,
+                    month: month,
+                    monthlyTakeHome: monthlyTakeHome,
+                    transactions: allTransactions,
+                    budgetPlanId: budgetPlan.id
+                )
+                print("📊 [BalancingService] Created snapshot for \(monthName(month)) \(year)")
+            }
+
+            // Also save balance record to Firestore
             let balance = MonthEndBalance(
                 year: year,
                 month: month,
@@ -165,10 +278,8 @@ class MonthEndBalancingService: ObservableObject {
             } catch {
                 print("❌ [BalancingService] Failed to save to Firestore: \(error)")
             }
-        }
 
-        // Re-check for more unbalanced months
-        Task {
+            // Re-check for more unbalanced months
             await checkForUnbalancedMonths()
         }
     }
@@ -306,7 +417,7 @@ class MonthEndBalancingService: ObservableObject {
                 throw BalancingError.defaultFundNotFound
             }
 
-            let transaction = Transaction(
+            var transaction = Transaction(
                 id: "",
                 amount: stats.netSavings,
                 date: lastDayOfMonth,
@@ -315,17 +426,22 @@ class MonthEndBalancingService: ObservableObject {
                 timestamp: Date()
             )
 
-            // Save transaction
+            // Save transaction to Firestore FIRST
+            print("📤 [BalancingService] Saving month-end transaction to Firestore...")
+            let firestoreId = try await BackendService.shared.createTransaction(transaction)
+            transaction.id = firestoreId
+
+            // Save to local storage with Firestore ID
             await MainActor.run {
                 TransactionStorageService.shared.saveTransaction(transaction)
             }
-            try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
-            let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
+
+            print("✅ [BalancingService] Saved transaction to Firestore (ID: \(firestoreId))")
 
             // Create allocation to default fund
             await MainActor.run {
                 _ = AllocationService.shared.createAllocation(
-                    transactionId: tempId,
+                    transactionId: firestoreId,
                     destinationType: .fund,
                     destinationId: defaultFund.id,
                     amount: stats.netSavings,
@@ -333,7 +449,7 @@ class MonthEndBalancingService: ObservableObject {
                 )
             }
 
-            transactionIds.append(tempId)
+            transactionIds.append(firestoreId)
             print(
                 "✅ [BalancingService] Allocated $\(String(format: "%.2f", stats.netSavings)) to \(defaultFund.name)"
             )
@@ -346,7 +462,7 @@ class MonthEndBalancingService: ObservableObject {
 
             let deficitAmount = abs(stats.netSavings)
 
-            let transaction = Transaction(
+            var transaction = Transaction(
                 id: "",
                 amount: deficitAmount,
                 date: lastDayOfMonth,
@@ -355,17 +471,23 @@ class MonthEndBalancingService: ObservableObject {
                 timestamp: Date()
             )
 
-            // Save transaction
+            // Save transaction to Firestore FIRST
+            print("📤 [BalancingService] Saving month-end deficit transaction to Firestore...")
+            let firestoreId = try await BackendService.shared.createTransaction(transaction)
+            transaction.id = firestoreId
+
+            // Save to local storage with Firestore ID
             await MainActor.run {
                 TransactionStorageService.shared.saveTransaction(transaction)
             }
-            try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
-            let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
+
+            print(
+                "✅ [BalancingService] Saved deficit transaction to Firestore (ID: \(firestoreId))")
 
             // Create allocation to default debt
             await MainActor.run {
                 _ = AllocationService.shared.createAllocation(
-                    transactionId: tempId,
+                    transactionId: firestoreId,
                     destinationType: .debt,
                     destinationId: defaultDebt.id,
                     amount: deficitAmount,
@@ -373,7 +495,7 @@ class MonthEndBalancingService: ObservableObject {
                 )
             }
 
-            transactionIds.append(tempId)
+            transactionIds.append(firestoreId)
             print(
                 "✅ [BalancingService] Allocated $\(String(format: "%.2f", deficitAmount)) to \(defaultDebt.name)"
             )

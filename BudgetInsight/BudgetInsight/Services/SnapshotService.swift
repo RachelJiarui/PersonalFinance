@@ -23,7 +23,7 @@ class SnapshotService: ObservableObject {
         monthlyTakeHome: Double,
         transactions: [Transaction],
         budgetPlanId: String
-    ) {
+    ) async {
         let calendar = Calendar.current
 
         // Filter transactions for this specific month
@@ -47,18 +47,39 @@ class SnapshotService: ObservableObject {
             transactionCount: monthTransactions.count
         )
 
-        // Check if snapshot for this month already exists
-        if let existingIndex = monthlySnapshots.firstIndex(where: {
-            $0.year == year && $0.month == month
-        }) {
-            // Update existing snapshot
-            monthlySnapshots[existingIndex] = snapshot
-        } else {
-            // Add new snapshot
-            monthlySnapshots.append(snapshot)
+        // Save to local storage first
+        await MainActor.run {
+            // Check if snapshot for this month already exists
+            if let existingIndex = monthlySnapshots.firstIndex(where: {
+                $0.year == year && $0.month == month
+            }) {
+                // Update existing snapshot
+                monthlySnapshots[existingIndex] = snapshot
+            } else {
+                // Add new snapshot
+                monthlySnapshots.append(snapshot)
+            }
+
+            saveSnapshots()
         }
 
-        saveSnapshots()
+        // Save to Firebase
+        print(
+            "📤 [SnapshotService] Attempting to save monthly snapshot to Firebase for \(month)/\(year)"
+        )
+        print(
+            "   Data: year=\(year), month=\(month), takeHome=\(snapshot.monthlyTakeHome), spending=\(snapshot.totalSpending), planId=\(snapshot.budgetPlanId)"
+        )
+        do {
+            let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
+            print(
+                "✅ [SnapshotService] Saved monthly snapshot for \(month)/\(year) to Firebase (ID: \(firebaseId))"
+            )
+        } catch {
+            print("❌ [SnapshotService] Failed to save monthly snapshot to Firebase: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            // Continue anyway - local storage succeeded
+        }
     }
 
     func createYearlySnapshot(
@@ -66,7 +87,7 @@ class SnapshotService: ObservableObject {
         monthlyTakeHome: Double,
         transactions: [Transaction],
         budgetPlanId: String
-    ) {
+    ) async {
         let annualTakeHome = monthlyTakeHome * 12.0
 
         let calendar = Calendar.current
@@ -91,16 +112,30 @@ class SnapshotService: ObservableObject {
             transactionCount: yearTransactions.count
         )
 
-        // Check if snapshot for this year already exists
-        if let existingIndex = yearlySnapshots.firstIndex(where: { $0.year == year }) {
-            // Update existing snapshot
-            yearlySnapshots[existingIndex] = snapshot
-        } else {
-            // Add new snapshot
-            yearlySnapshots.append(snapshot)
+        // Save to local storage first
+        await MainActor.run {
+            // Check if snapshot for this year already exists
+            if let existingIndex = yearlySnapshots.firstIndex(where: { $0.year == year }) {
+                // Update existing snapshot
+                yearlySnapshots[existingIndex] = snapshot
+            } else {
+                // Add new snapshot
+                yearlySnapshots.append(snapshot)
+            }
+
+            saveSnapshots()
         }
 
-        saveSnapshots()
+        // Save to Firebase
+        do {
+            let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
+            print(
+                "✅ [SnapshotService] Saved yearly snapshot for \(year) to Firebase (ID: \(firebaseId))"
+            )
+        } catch {
+            print("❌ [SnapshotService] Failed to save yearly snapshot to Firebase: \(error)")
+            // Continue anyway - local storage succeeded
+        }
     }
 
     // MARK: - Automatic Snapshot Updates
@@ -108,7 +143,7 @@ class SnapshotService: ObservableObject {
     func updateSnapshotsIfNeeded(
         monthlyTakeHome: Double,
         transactions: [Transaction]
-    ) {
+    ) async {
         let calendar = Calendar.current
         let now = Date()
         let currentYear = calendar.component(.year, from: now)
@@ -121,7 +156,7 @@ class SnapshotService: ObservableObject {
         }
 
         // Create/update snapshot for current month
-        createMonthlySnapshot(
+        await createMonthlySnapshot(
             year: currentYear,
             month: currentMonth,
             monthlyTakeHome: monthlyTakeHome,
@@ -130,7 +165,7 @@ class SnapshotService: ObservableObject {
         )
 
         // Create/update snapshot for current year
-        createYearlySnapshot(
+        await createYearlySnapshot(
             year: currentYear,
             monthlyTakeHome: monthlyTakeHome,
             transactions: transactions,

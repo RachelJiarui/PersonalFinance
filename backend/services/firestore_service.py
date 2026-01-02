@@ -622,21 +622,34 @@ class FirestoreService:
             period_type: 'monthly' or 'yearly'
             limit: Maximum number of snapshots
         """
-        query = self.db.collection("snapshots")
+        try:
+            query = self.db.collection("snapshots")
 
-        if period_type == "monthly":
-            query = query.where("month", "!=", None)
-        elif period_type == "yearly":
-            query = query.where("month", "==", None)
+            # Simplified query to avoid composite index requirement
+            # Filter in Python instead of Firestore for now
+            all_snapshots = query.limit(limit * 2).stream()
 
-        snapshots = (
-            query.order_by("year", direction=firestore.Query.DESCENDING)
-            .order_by("month", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-            .stream()
-        )
+            results = []
+            for snap in all_snapshots:
+                data = snap.to_dict()
+                if period_type == "monthly":
+                    if data.get("month") is not None:
+                        results.append({"id": snap.id, **data})
+                elif period_type == "yearly":
+                    if data.get("month") is None:
+                        results.append({"id": snap.id, **data})
+                else:
+                    results.append({"id": snap.id, **data})
 
-        return [{"id": snap.id, **snap.to_dict()} for snap in snapshots]
+            # Sort in Python
+            results.sort(
+                key=lambda x: (x.get("year", 0), x.get("month") or 0), reverse=True
+            )
+
+            return results[:limit]
+        except Exception as e:
+            print(f"Error fetching snapshots: {e}")
+            return []
 
     def create_snapshot(self, snapshot_data: Dict) -> str:
         """

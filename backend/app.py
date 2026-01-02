@@ -543,9 +543,12 @@ def create_snapshot():
     """Create a snapshot"""
     try:
         snapshot_data = request.get_json()
+        print(f"📥 [API] Received snapshot creation request: {snapshot_data}")
         snapshot_id = db.create_snapshot(snapshot_data)
+        print(f"✅ [API] Created snapshot with ID: {snapshot_id}")
         return jsonify({"success": True, "id": snapshot_id}), 201
     except Exception as e:
+        print(f"❌ [API] Error creating snapshot: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
