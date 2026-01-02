@@ -203,7 +203,7 @@ class MonthEndBalancingService: ObservableObject {
             .filter { $0.isExpense }
             .reduce(0.0) { $0 + $1.amount }
 
-        let netSavings = monthlyTakeHome - totalSpending
+        let netSavings = monthlyTakeHome + (totalIncome - totalSpending)
 
         // Calculate category balances
         let categoryBalances = calculateCategoryBalances(
@@ -316,18 +316,22 @@ class MonthEndBalancingService: ObservableObject {
             )
 
             // Save transaction
-            TransactionStorageService.shared.saveTransaction(transaction)
+            await MainActor.run {
+                TransactionStorageService.shared.saveTransaction(transaction)
+            }
             try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
             let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
 
             // Create allocation to default fund
-            _ = AllocationService.shared.createAllocation(
-                transactionId: tempId,
-                destinationType: .fund,
-                destinationId: defaultFund.id,
-                amount: stats.netSavings,
-                isExpense: false
-            )
+            await MainActor.run {
+                _ = AllocationService.shared.createAllocation(
+                    transactionId: tempId,
+                    destinationType: .fund,
+                    destinationId: defaultFund.id,
+                    amount: stats.netSavings,
+                    isExpense: false
+                )
+            }
 
             transactionIds.append(tempId)
             print(
@@ -352,18 +356,22 @@ class MonthEndBalancingService: ObservableObject {
             )
 
             // Save transaction
-            TransactionStorageService.shared.saveTransaction(transaction)
+            await MainActor.run {
+                TransactionStorageService.shared.saveTransaction(transaction)
+            }
             try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
             let tempId = transaction.id.isEmpty ? UUID().uuidString : transaction.id
 
             // Create allocation to default debt
-            _ = AllocationService.shared.createAllocation(
-                transactionId: tempId,
-                destinationType: .debt,
-                destinationId: defaultDebt.id,
-                amount: deficitAmount,
-                isExpense: true
-            )
+            await MainActor.run {
+                _ = AllocationService.shared.createAllocation(
+                    transactionId: tempId,
+                    destinationType: .debt,
+                    destinationId: defaultDebt.id,
+                    amount: deficitAmount,
+                    isExpense: true
+                )
+            }
 
             transactionIds.append(tempId)
             print(

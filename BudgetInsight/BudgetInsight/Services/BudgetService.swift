@@ -41,7 +41,9 @@ class BudgetService: ObservableObject {
                 guard let self = self else { return }
                 let transactions = TransactionStorageService.shared.transactions
                 print("🔔 [BudgetService] Allocations changed, recalculating category spending...")
-                self.updateCategorySpending(with: transactions)
+                Task { @MainActor in
+                    self.updateCategorySpending(with: transactions)
+                }
             }
             .store(in: &cancellables)
 
@@ -50,7 +52,9 @@ class BudgetService: ObservableObject {
             .sink { [weak self] transactions in
                 guard let self = self else { return }
                 print("🔔 [BudgetService] Transactions changed, recalculating category spending...")
-                self.updateCategorySpending(with: transactions)
+                Task { @MainActor in
+                    self.updateCategorySpending(with: transactions)
+                }
             }
             .store(in: &cancellables)
 
@@ -63,7 +67,9 @@ class BudgetService: ObservableObject {
                 print(
                     "🔔 [BudgetService] Budget categories changed (\(categories.count) categories), recalculating category spending..."
                 )
-                self.updateCategorySpending(with: transactions)
+                Task { @MainActor in
+                    self.updateCategorySpending(with: transactions)
+                }
             }
             .store(in: &cancellables)
     }

@@ -43,6 +43,9 @@ struct MonthEndBalancingView: View {
                                 onNext: { viewModel.currentStep = 2 }
                             )
                             .tag(0)
+                            .id(
+                                "\(stats.year)-\(stats.month)-\(stats.totalIncome)-\(stats.totalSpending)"
+                            )
 
                             // Step 2: Review Data
                             ReviewDataStepView(
@@ -61,6 +64,9 @@ struct MonthEndBalancingView: View {
                                 onComplete: completeCurrentMonth
                             )
                             .tag(2)
+                            .id(
+                                "\(stats.year)-\(stats.month)-\(stats.totalIncome)-\(stats.totalSpending)-summary"
+                            )
                         }
                         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     }
@@ -107,6 +113,12 @@ struct MonthEndBalancingView: View {
             }
             .onChange(of: currentMonthIndex) { _ in
                 loadCurrentMonth()
+            }
+            .onChange(of: viewModel.currentStep) { newStep in
+                // Refresh stats when navigating back to Month Wrapped from Review Data
+                if newStep == 0 {
+                    viewModel.refreshCurrentMonthStats()
+                }
             }
         }
     }

@@ -59,12 +59,16 @@ class MonthEndBalancingViewModel: ObservableObject {
 
     func completeBalancing() async {
         guard let stats = currentMonthStats else {
-            errorMessage = "No statistics available"
+            await MainActor.run {
+                errorMessage = "No statistics available"
+            }
             return
         }
 
-        isProcessing = true
-        errorMessage = nil
+        await MainActor.run {
+            isProcessing = true
+            errorMessage = nil
+        }
 
         do {
             // Auto-allocate net savings/deficit to default buckets
