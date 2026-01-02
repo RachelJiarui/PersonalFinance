@@ -193,26 +193,213 @@ class FirestoreService:
     # BUDGET PLANS
     # ========================================================================
 
-    def get_budget_plans(self, year: Optional[int] = None) -> List[Dict]:
+    def _same_month_year(self, date1: datetime, date2: datetime) -> bool:
         """
-        Get budget plans
+        Check if two dates are in the same month and year
 
         Args:
-            year: Filter by specific year. If None, returns all budget plans.
+            date1: First date
+            date2: Second date
+
+        Returns:
+            True if same month/year, False otherwise
+        """
+        return date1.year == date2.year and date1.month == date2.month
+
+    def _ranges_overlap(
+        self,
+        start1: datetime,
+        end1: Optional[datetime],
+        start2: datetime,
+        end2: Optional[datetime],
+    ) -> bool:
+        """
+        Check if two date ranges overlap (exclusive end dates)
+
+        Args:
+            start1: Start of first range (created_at)
+            end1: End of first range (end_date, None if active)
+            start2: Start of second range (created_at)
+            end2: End of second range (end_date, None if active)
+
+        Returns:
+            True if ranges overlap, False otherwise
+        """
+        # Convert to month precision (first day of month)
+        s1 = datetime(start1.year, start1.month, 1)
+        s2 = datetime(start2.year, start2.month, 1)
+
+        e1 = datetime(end1.year, end1.month, 1) if end1 else None
+        e2 = datetime(end2.year, end2.month, 1) if end2 else None
+
+        # If both ranges are infinite (no end), they overlap
+        if e1 is None and e2 is None:
+            return True
+
+        # If one range is infinite
+        if e1 is None:
+            return s1 < e2
+        if e2 is None:
+            return s2 < e1
+
+        # Both ranges are finite: overlap if start1 < end2 AND start2 < end1
+        return s1 < e2 and s2 < e1
+
+    def _validate_budget_plan_invariants(
+        self, plan_data: Dict, plan_id: Optional[str] = None
+    ) -> bool:
+        """
+        Enforce 4 budget plan invariants:
+        1. Only ONE active plan (end_date = null) at any time
+        2. created_at != end_date (must cover at least one month)
+        3. No overlapping ranges
+        4. created_at < end_date (chronological)
+
+        Args:
+            plan_data: Budget plan data to validate
+            plan_id: ID of plan being updated (None for new plans)
+
+        Returns:
+            True if all invariants pass, False otherwise
+        """
+        # Parse dates
+        try:
+            created_at_str = plan_data.get("created_at")
+            if not created_at_str:
+                print("❌ [Validation] created_at is required")
+                return False
+
+            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        except Exception as e:
+            print(f"❌ [Validation] Invalid created_at format: {e}")
+            return False
+
+        end_date = None
+        if plan_data.get("end_date"):
+            try:
+                end_date = datetime.fromisoformat(
+                    plan_data["end_date"].replace("Z", "+00:00")
+                )
+            except Exception as e:
+                print(f"❌ [Validation] Invalid end_date format: {e}")
+                return False
+
+        # Invariant 2 & 4: Date validation
+        if end_date:
+            # Invariant 2: Must cover at least one month
+            if self._same_month_year(created_at, end_date):
+                print(
+                    f"❌ [Validation] Invariant 2 failed: created_at and end_date cannot be same month/year"
+                )
+                return False
+
+            # Invariant 4: Chronological order
+            if created_at >= end_date:
+                print(
+                    f"❌ [Validation] Invariant 4 failed: created_at must be before end_date"
+                )
+                return False
+
+        # Invariant 1: Only one active plan
+        if end_date is None:
+            active_plans = self.get_active_budget_plans()
+            # If updating existing plan, allow it
+            for active_plan in active_plans:
+                if plan_id and active_plan["id"] == plan_id:
+                    continue  # Skip self
+                print(
+                    f"❌ [Validation] Invariant 1 failed: Another active plan already exists (ID: {active_plan['id']})"
+                )
+                return False
+
+        # Invariant 3: No overlapping ranges
+        all_plans = self.get_budget_plans()
+        for existing_plan in all_plans:
+            # Skip self when updating
+            if plan_id and existing_plan["id"] == plan_id:
+                continue
+
+            # Skip old schema plans that don't have created_at
+            if "created_at" not in existing_plan:
+                print(
+                    f"⚠️ [Validation] Skipping old schema plan {existing_plan.get('id')} - missing created_at"
+                )
+                continue
+
+            try:
+                existing_start = datetime.fromisoformat(
+                    existing_plan["created_at"].replace("Z", "+00:00")
+                )
+                existing_end = None
+                if existing_plan.get("end_date"):
+                    existing_end = datetime.fromisoformat(
+                        existing_plan["end_date"].replace("Z", "+00:00")
+                    )
+
+                if self._ranges_overlap(
+                    created_at, end_date, existing_start, existing_end
+                ):
+                    print(
+                        f"❌ [Validation] Invariant 3 failed: Range overlaps with plan {existing_plan['id']}"
+                    )
+                    return False
+            except Exception as e:
+                print(
+                    f"⚠️ [Validation] Error checking overlap with plan {existing_plan.get('id')}: {e}"
+                )
+                continue
+
+        print("✅ [Validation] All invariants passed")
+        return True
+
+    def get_budget_plans(self, year: Optional[int] = None) -> List[Dict]:
+        """
+        Get all budget plans
+
+        Args:
+            year: DEPRECATED - kept for backward compatibility during migration
+                  Returns all plans regardless of year in new schema
+
+        Returns:
+            List of all budget plans ordered by created_at descending
         """
         query = self.db.collection("budget_plans")
+        plans = query.order_by(
+            "created_at", direction=firestore.Query.DESCENDING
+        ).stream()
+        return [{"id": plan.id, **plan.to_dict()} for plan in plans]
 
-        if year:
-            query = query.where("year", "==", year)
+    def get_active_budget_plans(self) -> List[Dict]:
+        """
+        Get all active budget plans (end_date = null)
 
-        plans = query.order_by("year", direction=firestore.Query.DESCENDING).stream()
+        Note: Should only return ONE plan due to invariant enforcement
+
+        Returns:
+            List of active budget plans (should be length 0 or 1)
+        """
+        query = self.db.collection("budget_plans").where("end_date", "==", None)
+        plans = query.stream()
         return [{"id": plan.id, **plan.to_dict()} for plan in plans]
 
     def get_active_budget_plan(self) -> Optional[Dict]:
-        """Get the active budget plan (current year)"""
-        current_year = datetime.now().year
-        plans = self.get_budget_plans(year=current_year)
-        return plans[0] if plans else None
+        """
+        Get the single active budget plan (end_date = null)
+
+        Returns:
+            The active budget plan, or None if no active plan exists
+        """
+        active_plans = self.get_active_budget_plans()
+
+        if len(active_plans) == 0:
+            return None
+
+        if len(active_plans) > 1:
+            print(f"⚠️ [WARNING] Multiple active budget plans found - data corruption!")
+            # Return the most recent one
+            active_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
+
+        return active_plans[0]
 
     def get_budget_plan(self, plan_id: str) -> Optional[Dict]:
         """Get a specific budget plan"""
@@ -221,142 +408,58 @@ class FirestoreService:
             return {"id": doc.id, **doc.to_dict()}
         return None
 
-    def create_budget_plan(self, plan_data: Dict) -> str:
+    def get_budget_plan_for_date(self, target_date: datetime) -> Optional[Dict]:
         """
-        Create a budget plan with versioning support
+        Get the budget plan that covers a specific date
 
-        Expected fields:
-        - id: str (UUID)
-        - year: int
-        - annual_salary_gross: float
-        - user_income_id: str (UUID linking to UserIncome)
-        - category_ids: [str] (list of active BudgetCategory UUIDs)
-
-        Versioning fields:
-        - is_active: bool (default True)
-        - effective_date: str (ISO8601, defaults to now)
-        - end_date: str | null
-        - version_number: int
-        - change_reason: str | null
-        - superseded_by_plan_id: str | null
-        """
-        plan_data["created_at"] = firestore.SERVER_TIMESTAMP
-        plan_data["updated_at"] = firestore.SERVER_TIMESTAMP
-
-        # Set versioning defaults
-        plan_data["is_active"] = plan_data.get("is_active", True)
-
-        if "effective_date" not in plan_data:
-            plan_data["effective_date"] = datetime.now().isoformat()
-
-        plan_data.setdefault("end_date", None)
-        plan_data.setdefault("change_reason", None)
-        plan_data.setdefault("superseded_by_plan_id", None)
-
-        # Calculate version number if not provided (find highest version for this year + 1)
-        if "version_number" not in plan_data:
-            year = plan_data["year"]
-            existing_plans = self.get_budget_plans(year=year)
-            plan_data["version_number"] = len(existing_plans) + 1
-
-        # Remove id if present - let Firestore generate it
-        plan_data.pop("id", None)
-
-        # Firestore auto-generates ID
-        _, doc_ref = self.db.collection("budget_plans").add(plan_data)
-        return doc_ref.id
-
-    def update_budget_plan(self, plan_id: str, updates: Dict):
-        """Update a budget plan"""
-        updates["updated_at"] = firestore.SERVER_TIMESTAMP
-        self.db.collection("budget_plans").document(plan_id).update(updates)
-
-    def delete_budget_plan(self, plan_id: str):
-        """Delete a budget plan"""
-        self.db.collection("budget_plans").document(plan_id).delete()
-
-    def supersede_budget_plan(
-        self, old_plan_id: str, new_plan_id: str, end_date: datetime
-    ):
-        """
-        Mark an old budget plan as superseded by a new one
+        Returns the plan where:
+        created_at <= target_date < end_date (or end_date is null)
 
         Args:
-            old_plan_id: ID of the plan being superseded
-            new_plan_id: ID of the new plan that replaces it
-            end_date: When the old plan stopped being active
-        """
-        self.db.collection("budget_plans").document(old_plan_id).update(
-            {
-                "is_active": False,
-                "end_date": end_date.isoformat(),
-                "superseded_by_plan_id": new_plan_id,
-                "updated_at": firestore.SERVER_TIMESTAMP,
-            }
-        )
-
-    def get_active_budget_plan_for_date(
-        self, year: int, target_date: datetime
-    ) -> Optional[Dict]:
-        """
-        Get the budget plan that was active on a specific date
-
-        Args:
-            year: The year to search in
             target_date: The date to check
 
         Returns:
-            The budget plan that was active on that date, or None
+            The budget plan covering that date, or None
         """
-        plans = self.get_budget_plans(year=year)
+        # Normalize to month precision
+        target_month = datetime(target_date.year, target_date.month, 1)
 
-        for plan in plans:
-            effective = datetime.fromisoformat(plan["effective_date"])
-            end = (
-                datetime.fromisoformat(plan["end_date"])
-                if plan.get("end_date")
-                else None
-            )
+        # Fetch all plans (we need to filter in Python due to Firestore range query limitations)
+        all_plans = self.get_budget_plans()
 
-            # Check if target_date falls within this plan's active period
-            if effective <= target_date and (end is None or target_date < end):
-                return plan
+        for plan in all_plans:
+            try:
+                created_at = datetime.fromisoformat(
+                    plan["created_at"].replace("Z", "+00:00")
+                )
+                created_month = datetime(created_at.year, created_at.month, 1)
+
+                end_month = None
+                if plan.get("end_date"):
+                    end_date = datetime.fromisoformat(
+                        plan["end_date"].replace("Z", "+00:00")
+                    )
+                    end_month = datetime(end_date.year, end_date.month, 1)
+
+                # Check if target falls within range [created_month, end_month)
+                if created_month <= target_month:
+                    if end_month is None or target_month < end_month:
+                        return plan
+            except Exception as e:
+                print(
+                    f"⚠️ [BudgetPlan] Error parsing dates for plan {plan.get('id')}: {e}"
+                )
+                continue
 
         return None
 
-    # ========================================================================
-    # USER INCOME
-    # ========================================================================
-
-    def get_user_incomes(self, year: Optional[int] = None) -> List[Dict]:
+    def create_budget_plan(self, plan_data: Dict) -> str:
         """
-        Get user income records
-
-        Args:
-            year: Filter by specific year. If None, returns all records.
-        """
-        query = self.db.collection("user_incomes")
-
-        if year:
-            query = query.where("year", "==", year)
-
-        incomes = query.order_by("year", direction=firestore.Query.DESCENDING).stream()
-        return [{"id": income.id, **income.to_dict()} for income in incomes]
-
-    def get_user_income(self, income_id: str) -> Optional[Dict]:
-        """Get a specific user income record"""
-        doc = self.db.collection("user_incomes").document(income_id).get()
-        if doc.exists:
-            return {"id": doc.id, **doc.to_dict()}
-        return None
-
-    def create_user_income(self, income_data: Dict) -> str:
-        """
-        Create a user income record
+        Create a budget plan with monthly time-range model
 
         Expected fields:
-        - id: str (UUID)
-        - year: int
+        - created_at: str (ISO8601 month/year - e.g., "2025-03-01T00:00:00Z")
+        - end_date: str | null (ISO8601 month/year, exclusive, null = active)
         - annual_salary: float
         - contribution_401k: float
         - federal_tax: float
@@ -364,25 +467,64 @@ class FirestoreService:
         - medicare_tax: float
         - ny_state_tax: float
         - nyc_tax: float
+        - category_ids: [str] (list of active BudgetCategory UUIDs)
+
+        Returns:
+            Firestore-generated document ID
+
+        Raises:
+            ValueError: If budget plan violates invariants
         """
-        income_data["created_at"] = firestore.SERVER_TIMESTAMP
-        income_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        # Validation: Check invariants before creation
+        if not self._validate_budget_plan_invariants(plan_data):
+            raise ValueError("Budget plan violates invariants")
+
+        # Add Firestore timestamps
+        plan_data["created_at_firestore"] = firestore.SERVER_TIMESTAMP
+        plan_data["updated_at"] = firestore.SERVER_TIMESTAMP
 
         # Remove id if present - let Firestore generate it
-        income_data.pop("id", None)
+        plan_data.pop("id", None)
 
         # Firestore auto-generates ID
-        _, doc_ref = self.db.collection("user_incomes").add(income_data)
+        _, doc_ref = self.db.collection("budget_plans").add(plan_data)
+        print(f"✅ [BudgetPlan] Created budget plan with ID: {doc_ref.id}")
         return doc_ref.id
 
-    def update_user_income(self, income_id: str, updates: Dict):
-        """Update a user income record"""
-        updates["updated_at"] = firestore.SERVER_TIMESTAMP
-        self.db.collection("user_incomes").document(income_id).update(updates)
+    def update_budget_plan(self, plan_id: str, updates: Dict):
+        """
+        Update a budget plan
 
-    def delete_user_income(self, income_id: str):
-        """Delete a user income record"""
-        self.db.collection("user_incomes").document(income_id).delete()
+        Note: Typically used to set end_date when creating new plan.
+        Updates are validated against invariants.
+
+        Args:
+            plan_id: ID of plan to update
+            updates: Fields to update
+
+        Raises:
+            ValueError: If updates would violate invariants
+        """
+        # Get existing plan
+        existing_plan = self.get_budget_plan(plan_id)
+        if not existing_plan:
+            raise ValueError(f"Budget plan {plan_id} not found")
+
+        # Merge updates with existing data for validation
+        updated_plan = {**existing_plan, **updates}
+
+        # Validate if critical fields are being changed
+        if "created_at" in updates or "end_date" in updates:
+            if not self._validate_budget_plan_invariants(updated_plan, plan_id):
+                raise ValueError("Budget plan update violates invariants")
+
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("budget_plans").document(plan_id).update(updates)
+        print(f"✅ [BudgetPlan] Updated budget plan {plan_id}")
+
+    def delete_budget_plan(self, plan_id: str):
+        """Delete a budget plan"""
+        self.db.collection("budget_plans").document(plan_id).delete()
 
     # ========================================================================
     # FUNDS

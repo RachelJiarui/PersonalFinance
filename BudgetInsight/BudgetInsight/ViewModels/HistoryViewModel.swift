@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 @MainActor
 class HistoryViewModel: ObservableObject {
@@ -7,6 +7,10 @@ class HistoryViewModel: ObservableObject {
     @Published var yearlySnapshots: [PeriodSnapshot] = []
     @Published var selectedPeriod: PeriodType = .monthly
     @Published var selectedViewMode: ViewMode = .calendar
+
+    // Navigation state for historical budget detail view
+    @Published var selectedSnapshot: PeriodSnapshot?
+    @Published var showHistoricalDetail = false
 
     enum ViewMode {
         case calendar
@@ -44,5 +48,10 @@ class HistoryViewModel: ObservableObject {
 
     func toggleViewMode() {
         selectedViewMode = selectedViewMode == .calendar ? .graph : .calendar
+    }
+
+    func selectSnapshot(_ snapshot: PeriodSnapshot) {
+        selectedSnapshot = snapshot
+        showHistoricalDetail = true
     }
 }

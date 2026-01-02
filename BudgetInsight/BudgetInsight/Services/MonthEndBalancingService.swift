@@ -215,51 +215,39 @@ class MonthEndBalancingService: ObservableObject {
         Task {
             print("🔍 [BalancingService] Inside Task block for snapshot creation")
 
-            // Create snapshot for this month
+            // Create snapshot for this month using historical budget plan
             let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
-            let monthlyTakeHome = BudgetService.shared.getMonthlyTakeHomeForDate(lastDayOfMonth)
-            var budgetPlan = BudgetService.shared.budgetPlan
+
+            // Fetch the budget plan that was active during this historical month
+            guard
+                let historicalPlan = try? await BudgetService.shared.getBudgetPlanForDate(
+                    lastDayOfMonth)
+            else {
+                print("❌ [BalancingService] Cannot create snapshot - no budget plan for this date")
+                return
+            }
 
             print(
-                "🔍 [BalancingService] monthlyTakeHome: \(monthlyTakeHome != nil ? String(monthlyTakeHome!) : "NIL")"
+                "✅ [BalancingService] Found historical budget plan: \(historicalPlan.dateRangeString())"
+            )
+
+            let monthlyTakeHome = historicalPlan.monthlyTakeHome
+            print("🔍 [BalancingService] monthlyTakeHome: $\(monthlyTakeHome)")
+
+            print("🔍 [BalancingService] All conditions met, creating snapshot...")
+            let allTransactions = TransactionStorageService.shared.transactions
+            print("🔍 [BalancingService] Total transactions: \(allTransactions.count)")
+
+            await SnapshotService.shared.createMonthlySnapshot(
+                year: year,
+                month: month,
+                monthlyTakeHome: monthlyTakeHome,
+                transactions: allTransactions,
+                budgetPlanId: historicalPlan.id  // Use historical plan ID
             )
             print(
-                "🔍 [BalancingService] budgetPlan (local): \(budgetPlan != nil ? "EXISTS" : "NIL")")
-
-            // If budgetPlan is nil, try fetching from Firestore
-            if budgetPlan == nil {
-                print("🔍 [BalancingService] Fetching budget plan from Firestore...")
-                do {
-                    budgetPlan = try await BackendService.shared.fetchActiveBudgetPlan()
-
-                    if let plan = budgetPlan {
-                        print(
-                            "✅ [BalancingService] Fetched budget plan from Firestore (ID: \(plan.id), year: \(plan.year))"
-                        )
-                    } else {
-                        print("⚠️ [BalancingService] No active budget plan found in Firestore")
-                    }
-                } catch {
-                    print("❌ [BalancingService] Error fetching budget plan: \(error)")
-                }
-            }
-
-            if let monthlyTakeHome = monthlyTakeHome,
-                let budgetPlan = budgetPlan
-            {
-                print("🔍 [BalancingService] All conditions met, creating snapshot...")
-                let allTransactions = TransactionStorageService.shared.transactions
-                print("🔍 [BalancingService] Total transactions: \(allTransactions.count)")
-
-                await SnapshotService.shared.createMonthlySnapshot(
-                    year: year,
-                    month: month,
-                    monthlyTakeHome: monthlyTakeHome,
-                    transactions: allTransactions,
-                    budgetPlanId: budgetPlan.id
-                )
-                print("📊 [BalancingService] Created snapshot for \(monthName(month)) \(year)")
-            }
+                "📊 [BalancingService] Created snapshot with historical plan ID: \(historicalPlan.id)"
+            )
 
             // Also save balance record to Firestore
             let balance = MonthEndBalance(
@@ -286,7 +274,7 @@ class MonthEndBalancingService: ObservableObject {
 
     // MARK: - Statistics Calculation
 
-    func calculateMonthStats(year: Int, month: Int) -> MonthWrappedStats? {
+    func calculateMonthStats(year: Int, month: Int) async -> MonthWrappedStats? {
         // Get transactions for this month
         let monthTransactions = getTransactionsForMonth(year: year, month: month)
 
@@ -297,7 +285,9 @@ class MonthEndBalancingService: ObservableObject {
 
         // Get monthly take-home (use budget plan active at end of month)
         let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
-        guard let monthlyTakeHome = BudgetService.shared.getMonthlyTakeHomeForDate(lastDayOfMonth)
+        guard
+            let monthlyTakeHome = await BudgetService.shared.getMonthlyTakeHomeForDate(
+                lastDayOfMonth)
         else {
             print("❌ [BalancingService] No monthly take-home found for \(monthName(month)) \(year)")
             return nil
@@ -316,12 +306,13 @@ class MonthEndBalancingService: ObservableObject {
 
         let netSavings = monthlyTakeHome + (totalIncome - totalSpending)
 
-        // Calculate category balances
-        let categoryBalances = calculateCategoryBalances(
+        // Calculate category balances using historical categories
+        let categoryBalances = await calculateCategoryBalances(
             year: year,
             month: month,
             transactions: monthTransactions,
-            monthlyTakeHome: monthlyTakeHome
+            monthlyTakeHome: monthlyTakeHome,
+            targetDate: lastDayOfMonth
         )
 
         return MonthWrappedStats(
@@ -340,13 +331,14 @@ class MonthEndBalancingService: ObservableObject {
         year: Int,
         month: Int,
         transactions: [Transaction],
-        monthlyTakeHome: Double
-    ) -> [CategoryBalance] {
+        monthlyTakeHome: Double,
+        targetDate: Date
+    ) async -> [CategoryBalance] {
         let budgetService = BudgetService.shared
         let allocationService = AllocationService.shared
 
-        // Get active categories (from the budget plan active at month-end)
-        let categories = budgetService.getActiveCategories()
+        // Get categories that were active during this historical month
+        let categories = await budgetService.getActiveCategoriesForDate(targetDate)
 
         return categories.compactMap { category in
             // Calculate budget amount

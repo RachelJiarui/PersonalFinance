@@ -52,8 +52,12 @@ struct MonthEndBalancingView: View {
                                 year: stats.year,
                                 month: stats.month,
                                 onNext: {
-                                    viewModel.refreshCurrentMonthStats()
-                                    viewModel.nextStep()
+                                     Task {
+                                        await viewModel.refreshCurrentMonthStats()
+                                        await MainActor.run {
+                                            viewModel.nextStep()
+                                        }
+                                    }
                                 }
                             )
                             .tag(1)
@@ -117,7 +121,9 @@ struct MonthEndBalancingView: View {
             .onChange(of: viewModel.currentStep) { newStep in
                 // Refresh stats when navigating back to Month Wrapped from Review Data
                 if newStep == 0 {
-                    viewModel.refreshCurrentMonthStats()
+                    Task {
+                        await viewModel.refreshCurrentMonthStats()
+                    }
                 }
             }
         }
@@ -125,7 +131,9 @@ struct MonthEndBalancingView: View {
 
     private func loadCurrentMonth() {
         guard let month = currentMonth else { return }
-        viewModel.loadStatsForMonth(year: month.year, month: month.month)
+        Task {
+            await viewModel.loadStatsForMonth(year: month.year, month: month.month)
+        }
     }
 
     private func completeCurrentMonth() {

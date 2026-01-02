@@ -101,9 +101,14 @@ class TaxService {
 
     // MARK: - Main Tax Calculation
 
-    func calculateAllTaxes(annualSalary: Double, contribution401k: Double, year: Int? = nil)
-        -> UserIncome
-    {
+    /// Calculate all taxes and return the individual tax amounts
+    func calculateAllTaxes(annualSalary: Double, contribution401k: Double) -> (
+        federalTax: Double,
+        socialSecurityTax: Double,
+        medicareTax: Double,
+        nyStateTax: Double,
+        nycTax: Double
+    ) {
         let taxableIncome = annualSalary - contribution401k
 
         let federal = calculateFederalTax(taxableIncome: taxableIncome)
@@ -112,14 +117,7 @@ class TaxService {
         let nyState = calculateNYStateTax(taxableIncome: taxableIncome)
         let nyc = calculateNYCTax(taxableIncome: taxableIncome)
 
-        // Use provided year or current year
-        let currentYear = year ?? Calendar.current.component(.year, from: Date())
-
-        return UserIncome(
-            id: UUID().uuidString,
-            year: currentYear,
-            annualSalary: annualSalary,
-            contribution401k: contribution401k,
+        return (
             federalTax: federal,
             socialSecurityTax: socialSecurity,
             medicareTax: medicare,

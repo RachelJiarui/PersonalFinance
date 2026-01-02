@@ -3,7 +3,6 @@ import Foundation
 
 @MainActor
 class BudgetViewModel: ObservableObject {
-    @Published var userIncome: UserIncome?
     @Published var budgetPlan: BudgetPlan?
     @Published var budgetCategories: [BudgetCategory] = []
     @Published var validationError: String?
@@ -23,12 +22,14 @@ class BudgetViewModel: ObservableObject {
     }
 
     private func setupSubscriptions() {
-        budgetService.$userIncome
-            .assign(to: &$userIncome)
-
         budgetService.$budgetPlan
             .sink { [weak self] plan in
                 self?.budgetPlan = plan
+                // Update input fields when budget plan changes
+                if let plan = plan {
+                    self?.annualSalaryInput = String(format: "%.0f", plan.annualSalary)
+                    self?.contribution401kInput = String(format: "%.0f", plan.contribution401k)
+                }
                 self?.validateAllocation()
             }
             .store(in: &cancellables)
@@ -42,34 +43,44 @@ class BudgetViewModel: ObservableObject {
     }
 
     private func loadData() {
-        if let income = budgetService.userIncome {
-            annualSalaryInput = String(format: "%.0f", income.annualSalary)
-            contribution401kInput = String(format: "%.0f", income.contribution401k)
+        if let plan = budgetService.budgetPlan {
+            annualSalaryInput = String(format: "%.0f", plan.annualSalary)
+            contribution401kInput = String(format: "%.0f", plan.contribution401k)
         }
     }
 
     // MARK: - Income Management
 
-    func updateIncome() {
+    func updateIncome() async {
+        print(
+            "📝 [BudgetViewModel] updateIncome() called with salary: \(annualSalaryInput), 401k: \(contribution401kInput)"
+        )
+
         guard let salary = Double(annualSalaryInput),
             let contrib = Double(contribution401kInput),
             salary > 0
         else {
             validationError = "Please enter a valid salary"
+            print("❌ [BudgetViewModel] Validation failed: invalid salary")
             return
         }
 
         guard contrib >= 0 else {
             validationError = "401k contribution cannot be negative"
+            print("❌ [BudgetViewModel] Validation failed: negative 401k")
             return
         }
 
         guard contrib <= salary else {
             validationError = "401k contribution cannot exceed salary"
+            print("❌ [BudgetViewModel] Validation failed: 401k exceeds salary")
             return
         }
 
-        budgetService.updateUserIncome(annualSalary: salary, contribution401k: contrib)
+        print(
+            "✅ [BudgetViewModel] Validation passed, calling budgetService.updateBudgetPlanIncome()")
+        await budgetService.updateBudgetPlanIncome(annualSalary: salary, contribution401k: contrib)
+        print("✅ [BudgetViewModel] updateBudgetPlanIncome() completed")
         validationError = nil
     }
 
@@ -163,10 +174,10 @@ class BudgetViewModel: ObservableObject {
     }
 
     var monthlyTakeHome: Double {
-        return userIncome?.monthlyTakeHome ?? 0.0
+        return budgetPlan?.monthlyTakeHome ?? 0.0
     }
 
     var annualTakeHome: Double {
-        return userIncome?.annualTakeHome ?? 0.0
+        return budgetPlan?.annualTakeHome ?? 0.0
     }
 }

@@ -5,7 +5,6 @@ import Foundation
 class DashboardViewModel: ObservableObject {
     @Published var budgetCategories: [BudgetCategory] = []
     @Published var budgetPlan: BudgetPlan?
-    @Published var userIncome: UserIncome?
     @Published var categorySpending: [String: Double] = [:]
     @Published var isLoading: Bool = false
     @Published var transactions: [Transaction] = []
@@ -34,9 +33,6 @@ class DashboardViewModel: ObservableObject {
         budgetService.$budgetPlan
             .assign(to: &$budgetPlan)
 
-        budgetService.$userIncome
-            .assign(to: &$userIncome)
-
         budgetService.$categorySpending
             .assign(to: &$categorySpending)
     }
@@ -62,7 +58,7 @@ class DashboardViewModel: ObservableObject {
             budgetService.updateCategorySpending(with: storageService.transactions)
 
             // Update snapshots for historical tracking
-            if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+            if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
                 await snapshotService.updateSnapshotsIfNeeded(
                     monthlyTakeHome: monthlyTakeHome,
                     transactions: storageService.transactions
@@ -136,14 +132,6 @@ class DashboardViewModel: ObservableObject {
             print("📥 [DashboardViewModel] Fetching budget plan from backend...")
             if let plan = try await backendService.fetchActiveBudgetPlan() {
                 budgetService.budgetPlan = plan
-
-                // Fetch associated user income
-                if let income = try await backendService.fetchUserIncome(
-                    incomeId: plan.userIncomeId)
-                {
-                    budgetService.userIncome = income
-                }
-
                 budgetService.updateCategorySpending(with: storageService.transactions)
                 print("✅ [DashboardViewModel] Fetched budget plan from backend")
             } else {
@@ -192,7 +180,7 @@ class DashboardViewModel: ObservableObject {
         budgetService.updateCategorySpending(with: storageService.transactions)
 
         // Update snapshots for historical tracking (async in background)
-        if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+        if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
             Task {
                 await snapshotService.updateSnapshotsIfNeeded(
                     monthlyTakeHome: monthlyTakeHome,

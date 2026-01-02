@@ -4,10 +4,9 @@ import Foundation
 class BudgetService: ObservableObject {
     static let shared = BudgetService()
 
-    // New percentage-based budget system
+    // Budget plan with merged income/tax data
     @Published var budgetPlan: BudgetPlan?
     @Published var budgetCategories: [BudgetCategory] = []
-    @Published var userIncome: UserIncome?
 
     // Category spending tracking (categoryId -> amount spent this month)
     @Published var categorySpending: [String: Double] = [:]
@@ -15,11 +14,9 @@ class BudgetService: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let budgetPlanKey = "budget_plan"
     private let categoriesKey = "budget_categories"
-    private let incomeKey = "user_income"
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
-        loadUserIncome()
         loadBudgetCategories()
         loadBudgetPlan()
 
@@ -59,7 +56,6 @@ class BudgetService: ObservableObject {
             .store(in: &cancellables)
 
         // CRITICAL: Also recalculate when budget categories are loaded
-        // This ensures spending displays correctly when categories load from Firestore
         $budgetCategories
             .sink { [weak self] categories in
                 guard let self = self else { return }
@@ -80,26 +76,14 @@ class BudgetService: ObservableObject {
         print("🔄 [BudgetService] Fetching data from Firestore...")
 
         do {
-            // Fetch active budget plan for current year
+            // Fetch active budget plan (no longer year-specific)
             if let firestorePlan = try await BackendService.shared.fetchActiveBudgetPlan() {
-                print("✅ [BudgetService] Found existing BudgetPlan for year \(firestorePlan.year)")
+                print(
+                    "✅ [BudgetService] Found active BudgetPlan: \(firestorePlan.dateRangeString())")
 
                 await MainActor.run {
                     self.budgetPlan = firestorePlan
                     self.saveBudgetPlan()
-                }
-
-                // Fetch associated UserIncome
-                if !firestorePlan.userIncomeId.isEmpty {
-                    if let income = try await BackendService.shared.fetchUserIncome(
-                        incomeId: firestorePlan.userIncomeId)
-                    {
-                        print("✅ [BudgetService] Fetched UserIncome for year \(income.year)")
-                        await MainActor.run {
-                            self.userIncome = income
-                            self.saveUserIncome()
-                        }
-                    }
                 }
             } else {
                 print("ℹ️ [BudgetService] No active BudgetPlan found in Firestore")
@@ -123,81 +107,248 @@ class BudgetService: ObservableObject {
         }
     }
 
-    // MARK: - User Income Management
+    // MARK: - Budget Plan Management (Income & Taxes)
 
-    func updateUserIncome(annualSalary: Double, contribution401k: Double) {
-        let calculatedIncome = TaxService.shared.calculateAllTaxes(
+    /// Update budget plan with new income and tax data
+    /// Uses edit logic: same month = in-place update, different month = new plan
+    func updateBudgetPlanIncome(annualSalary: Double, contribution401k: Double) async {
+        let calculatedTaxes = TaxService.shared.calculateAllTaxes(
             annualSalary: annualSalary,
             contribution401k: contribution401k
         )
 
-        let currentYear = Calendar.current.component(.year, from: Date())
+        let now = Date()
 
-        // Create income with existing ID if updating, or empty ID if new
-        let incomeId = (userIncome?.year == currentYear) ? (userIncome?.id ?? "") : ""
+        if let currentPlan = budgetPlan {
+            // Check if we should update in-place or create new plan
+            if shouldUpdateInPlace(currentPlan: currentPlan, editDate: now) {
+                // Same month as created_at - update in-place
+                await updateBudgetPlanInPlace(
+                    annualSalary: annualSalary,
+                    contribution401k: contribution401k,
+                    taxes: calculatedTaxes
+                )
+            } else {
+                // Different month - create new plan
+                await createNewBudgetPlan(
+                    annualSalary: annualSalary,
+                    contribution401k: contribution401k,
+                    taxes: calculatedTaxes
+                )
+            }
+        } else {
+            // No existing plan - create first one
+            await createNewBudgetPlan(
+                annualSalary: annualSalary,
+                contribution401k: contribution401k,
+                taxes: calculatedTaxes
+            )
+        }
+    }
 
-        let incomeWithYear = UserIncome(
-            id: incomeId,
-            year: currentYear,
-            annualSalary: calculatedIncome.annualSalary,
-            contribution401k: calculatedIncome.contribution401k,
-            federalTax: calculatedIncome.federalTax,
-            socialSecurityTax: calculatedIncome.socialSecurityTax,
-            medicareTax: calculatedIncome.medicareTax,
-            nyStateTax: calculatedIncome.nyStateTax,
-            nycTax: calculatedIncome.nycTax
+    /// Determine if edit should update current plan in-place vs creating new plan
+    func shouldUpdateInPlace(currentPlan: BudgetPlan, editDate: Date) -> Bool {
+        let calendar = Calendar.current
+        let editMonth = calendar.component(.month, from: editDate)
+        let editYear = calendar.component(.year, from: editDate)
+        let createdMonth = calendar.component(.month, from: currentPlan.createdAt)
+        let createdYear = calendar.component(.year, from: currentPlan.createdAt)
+
+        // Same month/year = in-place update
+        return editMonth == createdMonth && editYear == createdYear
+    }
+
+    /// Update current budget plan in-place (same month as created_at)
+    private func updateBudgetPlanInPlace(
+        annualSalary: Double,
+        contribution401k: Double,
+        taxes: (
+            federalTax: Double,
+            socialSecurityTax: Double,
+            medicareTax: Double,
+            nyStateTax: Double,
+            nycTax: Double
+        )
+    ) async {
+        guard var plan = budgetPlan else { return }
+
+        print("🔄 [BudgetService] Updating budget plan in-place...")
+
+        // Get current active categories (might have changed since plan was created)
+        let activeCategoryIds = budgetCategories.filter { $0.isActive && !$0.id.isEmpty }.map {
+            $0.id
+        }
+
+        // Update plan fields
+        let updatedPlan = BudgetPlan(
+            id: plan.id,
+            createdAt: plan.createdAt,
+            endDate: plan.endDate,
+            annualSalary: annualSalary,
+            contribution401k: contribution401k,
+            federalTax: taxes.federalTax,
+            socialSecurityTax: taxes.socialSecurityTax,
+            medicareTax: taxes.medicareTax,
+            nyStateTax: taxes.nyStateTax,
+            nycTax: taxes.nycTax,
+            categoryIds: activeCategoryIds
         )
 
-        self.userIncome = incomeWithYear
-        saveUserIncome()
+        do {
+            // Update in Firestore
+            try await BackendService.shared.updateBudgetPlan(
+                planId: plan.id,
+                updates: [
+                    "annual_salary": annualSalary,
+                    "contribution_401k": contribution401k,
+                    "federal_tax": taxes.federalTax,
+                    "social_security_tax": taxes.socialSecurityTax,
+                    "medicare_tax": taxes.medicareTax,
+                    "ny_state_tax": taxes.nyStateTax,
+                    "nyc_tax": taxes.nycTax,
+                    "category_ids": activeCategoryIds,
+                ]
+            )
+            print("✅ [BudgetService] Updated budget plan in Firestore")
 
-        // Save or update to Firestore
-        Task {
+            // Update local state
+            await MainActor.run {
+                self.budgetPlan = updatedPlan
+                self.saveBudgetPlan()
+            }
+        } catch {
+            print("❌ [BudgetService] Error updating budget plan: \(error)")
+        }
+    }
+
+    /// Create new budget plan (different month than created_at, or first plan)
+    private func createNewBudgetPlan(
+        annualSalary: Double,
+        contribution401k: Double,
+        taxes: (
+            federalTax: Double,
+            socialSecurityTax: Double,
+            medicareTax: Double,
+            nyStateTax: Double,
+            nycTax: Double
+        )
+    ) async {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Normalize to first day of current month
+        let currentMonthStart = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: now))!
+
+        print("🆕 [BudgetService] Creating new budget plan...")
+
+        // Step 1: End-date the current plan if it exists
+        if let currentPlan = budgetPlan {
             do {
-                if !incomeId.isEmpty {
-                    // Update existing income
-                    try await BackendService.shared.updateUserIncome(
-                        incomeId: incomeId,
-                        updates: [
-                            "year": incomeWithYear.year,
-                            "annual_salary": incomeWithYear.annualSalary,
-                            "contribution_401k": incomeWithYear.contribution401k,
-                            "federal_tax": incomeWithYear.federalTax,
-                            "social_security_tax": incomeWithYear.socialSecurityTax,
-                            "medicare_tax": incomeWithYear.medicareTax,
-                            "ny_state_tax": incomeWithYear.nyStateTax,
-                            "nyc_tax": incomeWithYear.nycTax,
-                        ]
-                    )
-                    print("✅ [BudgetService] Updated UserIncome in Firestore")
-
-                    await MainActor.run {
-                        self.updateBudgetPlanIncome(income: incomeWithYear)
-                    }
-                } else {
-                    // Create new income
-                    let firestoreId = try await BackendService.shared.createUserIncome(
-                        incomeWithYear)
-                    print(
-                        "✅ [BudgetService] Created UserIncome in Firestore with ID: \(firestoreId)")
-
-                    await MainActor.run {
-                        var updatedIncome = incomeWithYear
-                        updatedIncome.id = firestoreId
-                        self.userIncome = updatedIncome
-                        self.saveUserIncome()
-
-                        // Update or create budget plan with the Firestore income ID
-                        self.updateBudgetPlanIncome(income: updatedIncome)
-                    }
-                }
+                try await BackendService.shared.updateBudgetPlan(
+                    planId: currentPlan.id,
+                    updates: [
+                        "end_date": ISO8601DateFormatter().string(from: currentMonthStart)
+                    ]
+                )
+                print("✅ [BudgetService] End-dated previous plan")
             } catch {
-                print("❌ [BudgetService] Error saving UserIncome to Firestore: \(error)")
+                print("❌ [BudgetService] Error end-dating previous plan: \(error)")
+                return
             }
         }
 
-        // Trigger UI update
-        objectWillChange.send()
+        // Step 2: Create new plan
+        // Get ALL active categories (not filtered by plan, since we're creating the plan now)
+        let activeCategoryIds = budgetCategories.filter { $0.isActive && !$0.id.isEmpty }.map {
+            $0.id
+        }
+
+        let newPlan = BudgetPlan(
+            id: "",
+            createdAt: currentMonthStart,
+            endDate: nil,
+            annualSalary: annualSalary,
+            contribution401k: contribution401k,
+            federalTax: taxes.federalTax,
+            socialSecurityTax: taxes.socialSecurityTax,
+            medicareTax: taxes.medicareTax,
+            nyStateTax: taxes.nyStateTax,
+            nycTax: taxes.nycTax,
+            categoryIds: activeCategoryIds
+        )
+
+        do {
+            // Save to Firestore to get real ID
+            let firestoreId = try await BackendService.shared.createBudgetPlan(newPlan)
+            print("✅ [BudgetService] Created new BudgetPlan in Firestore with ID: \(firestoreId)")
+
+            // Update local state
+            await MainActor.run {
+                let savedPlan = BudgetPlan(
+                    id: firestoreId,
+                    createdAt: newPlan.createdAt,
+                    endDate: newPlan.endDate,
+                    annualSalary: newPlan.annualSalary,
+                    contribution401k: newPlan.contribution401k,
+                    federalTax: newPlan.federalTax,
+                    socialSecurityTax: newPlan.socialSecurityTax,
+                    medicareTax: newPlan.medicareTax,
+                    nyStateTax: newPlan.nyStateTax,
+                    nycTax: newPlan.nycTax,
+                    categoryIds: newPlan.categoryIds
+                )
+                self.budgetPlan = savedPlan
+                self.saveBudgetPlan()
+                print(
+                    "✅ [BudgetService] Budget plan saved locally: Annual Salary: \(savedPlan.annualSalary), Monthly Take Home: \(savedPlan.monthlyTakeHome), Category IDs: \(savedPlan.categoryIds)"
+                )
+            }
+        } catch {
+            print("❌ [BudgetService] Error creating new budget plan: \(error)")
+        }
+    }
+
+    // MARK: - Historical Budget Plan Lookup
+
+    /// Get budget plan for a specific date (historical lookup)
+    func getBudgetPlanForDate(_ date: Date) async throws -> BudgetPlan? {
+        // First check local cache
+        if let currentPlan = budgetPlan, currentPlan.covers(date: date) {
+            return currentPlan
+        }
+
+        // Fetch from backend
+        let dateFormatter = ISO8601DateFormatter()
+        let dateString = dateFormatter.string(from: date)
+
+        return try await BackendService.shared.fetchBudgetPlanForDate(dateString)
+    }
+
+    /// Get monthly take-home for a specific date (handles historical budget plans)
+    func getMonthlyTakeHomeForDate(_ date: Date) async -> Double? {
+        do {
+            let plan = try await getBudgetPlanForDate(date)
+            return plan?.monthlyTakeHome
+        } catch {
+            print("❌ [BudgetService] Error fetching plan for date: \(error)")
+            return nil
+        }
+    }
+
+    /// Get active categories for a specific date (handles historical budget plans)
+    func getActiveCategoriesForDate(_ date: Date) async -> [BudgetCategory] {
+        do {
+            guard let plan = try await getBudgetPlanForDate(date) else {
+                return []
+            }
+
+            // Fetch categories by IDs
+            return budgetCategories.filter { plan.categoryIds.contains($0.id) }
+        } catch {
+            print("❌ [BudgetService] Error fetching categories for date: \(error)")
+            return []
+        }
     }
 
     // MARK: - Budget Category Management
@@ -215,7 +366,6 @@ class BudgetService: ObservableObject {
         budgetCategories.append(newCategory)
         saveBudgetCategories()
 
-        // Note: Budget plan will be updated once we get the real ID from backend
         return newCategory
     }
 
@@ -231,14 +381,35 @@ class BudgetService: ObservableObject {
 
             // Add to budget plan if exists
             if var plan = budgetPlan {
-                plan.categoryIds.append(firestoreId)
-                budgetPlan = plan
-                saveBudgetPlan()
+                var updatedCategoryIds = plan.categoryIds
+                updatedCategoryIds.append(firestoreId)
 
-                // Update BudgetPlan in Firestore
+                // Update plan with new category
                 Task {
                     do {
-                        try await self.saveBudgetPlanToFirestore(plan)
+                        try await BackendService.shared.updateBudgetPlan(
+                            planId: plan.id,
+                            updates: ["category_ids": updatedCategoryIds]
+                        )
+
+                        // Update local state
+                        await MainActor.run {
+                            let updatedPlan = BudgetPlan(
+                                id: plan.id,
+                                createdAt: plan.createdAt,
+                                endDate: plan.endDate,
+                                annualSalary: plan.annualSalary,
+                                contribution401k: plan.contribution401k,
+                                federalTax: plan.federalTax,
+                                socialSecurityTax: plan.socialSecurityTax,
+                                medicareTax: plan.medicareTax,
+                                nyStateTax: plan.nyStateTax,
+                                nycTax: plan.nycTax,
+                                categoryIds: updatedCategoryIds
+                            )
+                            self.budgetPlan = updatedPlan
+                            self.saveBudgetPlan()
+                        }
                     } catch {
                         print(
                             "❌ [BudgetService] Error updating BudgetPlan after adding category: \(error)"
@@ -309,26 +480,43 @@ class BudgetService: ObservableObject {
     func deleteCategory(categoryId: String) {
         // Mark as inactive instead of deleting (for historical data integrity)
         if let index = budgetCategories.firstIndex(where: { $0.id == categoryId }) {
-            let categoryName = budgetCategories[index].name
             budgetCategories[index].isActive = false
             saveBudgetCategories()
 
-            // Remove from budget plan's active categories by creating a new version
+            // Remove from budget plan's active categories
             if let plan = budgetPlan {
                 let updatedCategoryIds = plan.categoryIds.filter { $0 != categoryId }
 
-                // Update both in Firestore
                 Task {
                     do {
                         // Mark category as inactive in Firestore
                         try await BackendService.shared.deleteBudgetCategory(categoryId)
                         print("✅ [BudgetService] Marked category as inactive in Firestore")
 
-                        // Create new budget plan version with updated categories
-                        await createBudgetPlanVersion(
-                            reason: "Removed category: \(categoryName)",
-                            categoryChanges: updatedCategoryIds
+                        // Update budget plan
+                        try await BackendService.shared.updateBudgetPlan(
+                            planId: plan.id,
+                            updates: ["category_ids": updatedCategoryIds]
                         )
+
+                        // Update local state
+                        await MainActor.run {
+                            let updatedPlan = BudgetPlan(
+                                id: plan.id,
+                                createdAt: plan.createdAt,
+                                endDate: plan.endDate,
+                                annualSalary: plan.annualSalary,
+                                contribution401k: plan.contribution401k,
+                                federalTax: plan.federalTax,
+                                socialSecurityTax: plan.socialSecurityTax,
+                                medicareTax: plan.medicareTax,
+                                nyStateTax: plan.nyStateTax,
+                                nycTax: plan.nycTax,
+                                categoryIds: updatedCategoryIds
+                            )
+                            self.budgetPlan = updatedPlan
+                            self.saveBudgetPlan()
+                        }
                     } catch {
                         print("❌ [BudgetService] Error deleting category: \(error)")
                     }
@@ -338,145 +526,19 @@ class BudgetService: ObservableObject {
     }
 
     func getActiveCategories() -> [BudgetCategory] {
+        // If we have a budget plan, only return categories that are in the plan
+        if let plan = budgetPlan {
+            return budgetCategories.filter { category in
+                category.isActive && plan.categoryIds.contains(category.id)
+            }
+        }
+
+        // If no budget plan exists, return all active categories (for setup phase)
         return budgetCategories.filter { $0.isActive }
     }
 
     func getCategoryById(_ id: String) -> BudgetCategory? {
         return budgetCategories.first { $0.id == id }
-    }
-
-    // MARK: - Budget Plan Management
-
-    func updateBudgetPlanIncome(income: UserIncome) {
-        let currentYear = Calendar.current.component(.year, from: Date())
-
-        if let plan = budgetPlan, plan.year == currentYear {
-            // Mid-year change - create new version
-            Task {
-                await createBudgetPlanVersion(
-                    reason: "Income updated",
-                    annualSalary: income.annualSalary,
-                    userIncomeId: income.id
-                )
-            }
-        } else {
-            // New year - create first version for the year
-            let activeCategoryIds = getActiveCategories().filter { !$0.id.isEmpty }.map { $0.id }
-            let newPlan = BudgetPlan(
-                id: "",  // Firestore will generate this
-                year: income.year,
-                annualSalaryGross: income.annualSalary,
-                userIncomeId: income.id,
-                categoryIds: activeCategoryIds,
-                isActive: true,
-                effectiveDate: Date(),
-                endDate: nil,
-                versionNumber: 1,
-                changeReason: "Initial plan for \(income.year)",
-                supersededByPlanId: nil
-            )
-            budgetPlan = newPlan
-            saveBudgetPlan()
-
-            // Save to Firestore to get real ID
-            Task {
-                do {
-                    let firestoreId = try await BackendService.shared.createBudgetPlan(newPlan)
-                    print(
-                        "✅ [BudgetService] Created BudgetPlan in Firestore with ID: \(firestoreId)")
-
-                    await MainActor.run {
-                        var updatedPlan = newPlan
-                        updatedPlan.id = firestoreId
-                        self.budgetPlan = updatedPlan
-                        self.saveBudgetPlan()
-                    }
-                } catch {
-                    print("❌ [BudgetService] Error creating BudgetPlan in Firestore: \(error)")
-                }
-            }
-        }
-    }
-
-    func createBudgetPlanVersion(
-        reason: String,
-        annualSalary: Double? = nil,
-        userIncomeId: String? = nil,
-        categoryChanges: [String]? = nil
-    ) async {
-        guard let currentPlan = budgetPlan else { return }
-
-        let now = Date()
-        let currentYear = Calendar.current.component(.year, from: now)
-
-        // Only create version if changing within same year
-        guard currentPlan.year == currentYear else {
-            print("⚠️ [BudgetService] Cannot version plan from different year")
-            return
-        }
-
-        // Determine new values
-        let newAnnualSalary = annualSalary ?? currentPlan.annualSalaryGross
-        let newUserIncomeId = userIncomeId ?? currentPlan.userIncomeId
-        let newCategoryIds = categoryChanges ?? currentPlan.categoryIds
-
-        // Create new BudgetPlan version
-        let newPlan = BudgetPlan(
-            id: "",
-            year: currentYear,
-            annualSalaryGross: newAnnualSalary,
-            userIncomeId: newUserIncomeId,
-            categoryIds: newCategoryIds,
-            isActive: true,
-            effectiveDate: now,
-            endDate: nil,
-            versionNumber: currentPlan.versionNumber + 1,
-            changeReason: reason,
-            supersededByPlanId: nil
-        )
-
-        do {
-            // Save new plan to Firestore
-            let newPlanId = try await BackendService.shared.createBudgetPlan(newPlan)
-            print("✅ [BudgetService] Created budget plan version \(newPlan.versionNumber)")
-
-            // Mark old plan as superseded
-            try await BackendService.shared.supersedeBudgetPlan(
-                oldPlanId: currentPlan.id,
-                newPlanId: newPlanId,
-                endDate: now
-            )
-            print("✅ [BudgetService] Marked old plan as superseded")
-
-            // Update local state
-            await MainActor.run {
-                var savedPlan = newPlan
-                savedPlan.id = newPlanId
-                self.budgetPlan = savedPlan
-                self.saveBudgetPlan()
-            }
-        } catch {
-            print("❌ [BudgetService] Error creating budget plan version: \(error)")
-        }
-    }
-
-    private func saveBudgetPlanToFirestore(_ plan: BudgetPlan) async throws {
-        guard !plan.id.isEmpty else {
-            print("⚠️ [BudgetService] Cannot update BudgetPlan with empty ID")
-            return
-        }
-
-        // Update the existing plan in Firestore
-        try await BackendService.shared.updateBudgetPlan(
-            planId: plan.id,
-            updates: [
-                "year": plan.year,
-                "annual_salary_gross": plan.annualSalaryGross,
-                "user_income_id": plan.userIncomeId,
-                "category_ids": plan.categoryIds,
-            ]
-        )
-        print("✅ [BudgetService] Updated BudgetPlan in Firestore")
     }
 
     func validateAllocation() -> (isValid: Bool, totalPercentage: Double) {
@@ -576,21 +638,21 @@ class BudgetService: ObservableObject {
 
     func getCategoryBudgetAmount(categoryId: String) -> Double? {
         guard let category = getCategoryById(categoryId),
-            let income = userIncome
+            let plan = budgetPlan
         else {
             return nil
         }
-        return category.dollarAmount(monthlyTakeHome: income.monthlyTakeHome)
+        return category.dollarAmount(monthlyTakeHome: plan.monthlyTakeHome)
     }
 
     func getCategorySpendingRatio(categoryId: String) -> Double? {
         guard let category = getCategoryById(categoryId),
-            let income = userIncome
+            let plan = budgetPlan
         else {
             return nil
         }
         let spent = getSpending(forCategoryId: categoryId)
-        return category.spendingRatio(currentSpent: spent, monthlyTakeHome: income.monthlyTakeHome)
+        return category.spendingRatio(currentSpent: spent, monthlyTakeHome: plan.monthlyTakeHome)
     }
 
     // MARK: - Clear Data
@@ -598,12 +660,10 @@ class BudgetService: ObservableObject {
     func clearAllData() {
         budgetPlan = nil
         budgetCategories = []
-        userIncome = nil
         categorySpending = [:]
 
         userDefaults.removeObject(forKey: budgetPlanKey)
         userDefaults.removeObject(forKey: categoriesKey)
-        userDefaults.removeObject(forKey: incomeKey)
     }
 
     // MARK: - Persistence
@@ -642,37 +702,5 @@ class BudgetService: ObservableObject {
         } else {
             print("⚠️ [BudgetService] No budget categories found in local storage")
         }
-        // No default categories - user creates their own in Budget Plan
-    }
-
-    private func saveUserIncome() {
-        if let encoded = try? JSONEncoder().encode(userIncome) {
-            userDefaults.set(encoded, forKey: incomeKey)
-        }
-    }
-
-    private func loadUserIncome() {
-        if let data = userDefaults.data(forKey: incomeKey),
-            let decoded = try? JSONDecoder().decode(UserIncome.self, from: data)
-        {
-            userIncome = decoded
-        }
-    }
-
-    // MARK: - Month-End Balancing Helper Methods
-
-    /// Get monthly take-home for a specific date (handles historical budget plans)
-    func getMonthlyTakeHomeForDate(_ date: Date) -> Double? {
-        // For now, use current income since we don't have historical plan fetching
-        // Future enhancement: fetch the budget plan that was active on this date from Firestore
-        guard let income = userIncome else { return nil }
-        return income.monthlyTakeHome
-    }
-
-    /// Get active categories for a specific date (handles historical budget plans)
-    func getActiveCategoriesForDate(_ date: Date) -> [BudgetCategory] {
-        // For now, return current active categories
-        // Future enhancement: fetch categories from the budget plan active on this date
-        return getActiveCategories()
     }
 }

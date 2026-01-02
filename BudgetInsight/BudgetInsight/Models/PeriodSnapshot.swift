@@ -6,7 +6,7 @@ struct PeriodSnapshot: Identifiable, Codable, Equatable {
     let month: Int?  // nil for yearly snapshot
 
     // Financial data
-    let monthlyTakeHome: Double  // From UserIncome at the time
+    let monthlyTakeHome: Double  // From BudgetPlan at the time
     let totalSpending: Double  // Sum of all transactions for this period
     let savings: Double  // takeHome - spending
 

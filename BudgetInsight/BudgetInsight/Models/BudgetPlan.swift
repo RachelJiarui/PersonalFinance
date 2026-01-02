@@ -1,65 +1,145 @@
 import Foundation
 
-/// Represents the budget plan for a specific year
-/// Supports versioning - multiple budget plans can exist for the same year with different effective dates
+/// Represents a budget plan with monthly time-range model
+/// Budget plans span months and can cross calendar years (e.g., Nov 2025 - Feb 2026)
+/// Income and tax data is included directly in the BudgetPlan
 struct BudgetPlan: Identifiable, Codable, Equatable {
     // ID - Firestore auto-generates, empty until saved to backend
     var id: String
 
-    let year: Int
-    let annualSalaryGross: Double
-    let userIncomeId: String  // Links to UserIncome for tax calculations (Firestore ID)
-    var categoryIds: [String]  // List of BudgetCategory IDs (only active categories, Firestore IDs)
+    // Time range (month/year precision)
+    let createdAt: Date  // First month active (stored as first day of month)
+    let endDate: Date?  // Exclusive - first month NOT covered (nil = active)
 
-    // Versioning fields - support mid-year budget changes without affecting historical data
-    var isActive: Bool  // Only one active plan per year at any time
-    var effectiveDate: Date  // When this version became active
-    var endDate: Date?  // When superseded by new version (nil if still active)
-    var versionNumber: Int  // Human-readable version (v1, v2, v3... per year)
-    var changeReason: String?  // Optional description of why version was created
-    var supersededByPlanId: String?  // ID of the plan that replaced this one
+    // Income & Taxes
+    let annualSalary: Double
+    let contribution401k: Double
+    let federalTax: Double
+    let socialSecurityTax: Double
+    let medicareTax: Double
+    let nyStateTax: Double
+    let nycTax: Double
+
+    // Categories
+    var categoryIds: [String]  // Active budget category UUIDs
+
+    // MARK: - Coding Keys
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case createdAt = "created_at"
+        case endDate = "end_date"
+        case annualSalary = "annual_salary"
+        case contribution401k = "contribution_401k"
+        case federalTax = "federal_tax"
+        case socialSecurityTax = "social_security_tax"
+        case medicareTax = "medicare_tax"
+        case nyStateTax = "ny_state_tax"
+        case nycTax = "nyc_tax"
+        case categoryIds = "category_ids"
+    }
 
     init(
         id: String = "",
-        year: Int,
-        annualSalaryGross: Double,
-        userIncomeId: String,
-        categoryIds: [String] = [],
-        isActive: Bool = true,
-        effectiveDate: Date = Date(),
+        createdAt: Date,
         endDate: Date? = nil,
-        versionNumber: Int = 1,
-        changeReason: String? = nil,
-        supersededByPlanId: String? = nil
+        annualSalary: Double,
+        contribution401k: Double,
+        federalTax: Double,
+        socialSecurityTax: Double,
+        medicareTax: Double,
+        nyStateTax: Double,
+        nycTax: Double,
+        categoryIds: [String] = []
     ) {
         self.id = id
-        self.year = year
-        self.annualSalaryGross = annualSalaryGross
-        self.userIncomeId = userIncomeId
-        self.categoryIds = categoryIds
-        self.isActive = isActive
-        self.effectiveDate = effectiveDate
+        self.createdAt = createdAt
         self.endDate = endDate
-        self.versionNumber = versionNumber
-        self.changeReason = changeReason
-        self.supersededByPlanId = supersededByPlanId
+        self.annualSalary = annualSalary
+        self.contribution401k = contribution401k
+        self.federalTax = federalTax
+        self.socialSecurityTax = socialSecurityTax
+        self.medicareTax = medicareTax
+        self.nyStateTax = nyStateTax
+        self.nycTax = nycTax
+        self.categoryIds = categoryIds
+    }
+
+    // MARK: - Computed Properties
+
+    var taxableIncome: Double {
+        annualSalary - contribution401k
+    }
+
+    var totalTaxes: Double {
+        federalTax + socialSecurityTax + medicareTax + nyStateTax + nycTax
+    }
+
+    var annualTakeHome: Double {
+        annualSalary - contribution401k - totalTaxes
+    }
+
+    var monthlyTakeHome: Double {
+        annualTakeHome / 12.0
+    }
+
+    var isActive: Bool {
+        endDate == nil
     }
 
     // MARK: - Helper Methods
 
-    /// Check if this plan is currently active (not superseded and effectiveDate has passed)
-    var isCurrentlyActive: Bool {
-        guard isActive else { return false }
-        let now = Date()
-        return effectiveDate <= now && (endDate == nil || now < endDate!)
+    /// Check if this plan covers a specific date
+    /// - Parameter date: The date to check
+    /// - Returns: True if the plan covers that date
+    func covers(date: Date) -> Bool {
+        let calendar = Calendar.current
+        let targetMonth = calendar.startOfMonth(for: date)
+        let planStartMonth = calendar.startOfMonth(for: createdAt)
+
+        if let endDate = endDate {
+            let planEndMonth = calendar.startOfMonth(for: endDate)
+            // Range is [createdAt, endDate) - exclusive end
+            return targetMonth >= planStartMonth && targetMonth < planEndMonth
+        } else {
+            // Active plan (no end date)
+            return targetMonth >= planStartMonth
+        }
     }
 
-    /// Check if this plan was active on a specific date
-    /// - Parameter date: The date to check
-    /// - Returns: True if the plan was active on that date
-    func wasActive(on date: Date) -> Bool {
-        let afterStart = date >= effectiveDate
-        let beforeEnd = endDate == nil || date < endDate!
-        return afterStart && beforeEnd
+    /// Get month/year string for created_at
+    /// - Returns: Formatted string like "March 2025"
+    func createdAtMonthYear() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: createdAt)
+    }
+
+    /// Get date range string for display
+    /// - Returns: Formatted string like "March 2025 - June 2025" or "March 2025 - Present"
+    func dateRangeString() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        let start = formatter.string(from: createdAt)
+
+        if let endDate = endDate {
+            let end = formatter.string(from: endDate)
+            return "\(start) - \(end)"
+        } else {
+            return "\(start) - Present"
+        }
+    }
+}
+
+// MARK: - Calendar Extension
+
+extension Calendar {
+    /// Get the first day of the month for a given date
+    /// - Parameter date: The date
+    /// - Returns: Date representing first day of that month
+    func startOfMonth(for date: Date) -> Date {
+        let components = dateComponents([.year, .month], from: date)
+        return self.date(from: components)!
     }
 }

@@ -102,9 +102,21 @@ class BackendService: ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            (200...299).contains(httpResponse.statusCode)
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.invalidResponse
+        }
+
+        if !(200...299).contains(httpResponse.statusCode) {
+            // Try to parse error message from response
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let errorMessage = errorJson["error"] as? String
+            {
+                print("❌ [BackendService] Budget plan creation failed: \(errorMessage)")
+            } else {
+                print(
+                    "❌ [BackendService] Budget plan creation failed with status: \(httpResponse.statusCode)"
+                )
+            }
             throw BackendError.invalidResponse
         }
 
@@ -207,9 +219,23 @@ class BackendService: ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            (200...299).contains(httpResponse.statusCode)
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.invalidResponse
+        }
+
+        if !(200...299).contains(httpResponse.statusCode) {
+            // Try to parse error message from response
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let errorMessage = errorJson["error"] as? String
+            {
+                print(
+                    "❌ [BackendService] Create budget plan failed (\(httpResponse.statusCode)): \(errorMessage)"
+                )
+            } else {
+                print(
+                    "❌ [BackendService] Create budget plan failed with status: \(httpResponse.statusCode)"
+                )
+            }
             throw BackendError.invalidResponse
         }
 
@@ -271,21 +297,46 @@ class BackendService: ObservableObject {
             throw BackendError.invalidResponse
         }
 
+        return try parseBudgetPlanResponse(data)
+    }
+
+    func fetchBudgetPlanForDate(_ dateString: String) async throws -> BudgetPlan? {
+        let url = URL(string: "\(baseURL)/budget-plans/for-date/\(dateString)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 404 {
+            return nil  // No plan found for this date
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw BackendError.invalidResponse
+        }
+
+        return try parseBudgetPlanResponse(data)
+    }
+
+    private func parseBudgetPlanResponse(_ data: Data) throws -> BudgetPlan {
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let id = dict["id"] as? String,
-            let year = dict["year"] as? Int,
-            let annualSalaryGross = dict["annual_salary_gross"] as? Double,
-            let userIncomeId = dict["user_income_id"] as? String,
-            let categoryIds = dict["category_ids"] as? [String],
-            let isActive = dict["is_active"] as? Bool,
-            let effectiveDateString = dict["effective_date"] as? String,
-            let versionNumber = dict["version_number"] as? Int
+            let createdAtString = dict["created_at"] as? String,
+            let annualSalary = dict["annual_salary"] as? Double,
+            let contribution401k = dict["contribution_401k"] as? Double,
+            let federalTax = dict["federal_tax"] as? Double,
+            let socialSecurityTax = dict["social_security_tax"] as? Double,
+            let medicareTax = dict["medicare_tax"] as? Double,
+            let nyStateTax = dict["ny_state_tax"] as? Double,
+            let nycTax = dict["nyc_tax"] as? Double,
+            let categoryIds = dict["category_ids"] as? [String]
         else {
             throw BackendError.invalidData
         }
 
         let dateFormatter = ISO8601DateFormatter()
-        guard let effectiveDate = dateFormatter.date(from: effectiveDateString) else {
+        guard let createdAt = dateFormatter.date(from: createdAtString) else {
             throw BackendError.invalidData
         }
 
@@ -294,21 +345,18 @@ class BackendService: ObservableObject {
             endDate = dateFormatter.date(from: endDateString)
         }
 
-        let changeReason = dict["change_reason"] as? String
-        let supersededByPlanId = dict["superseded_by_plan_id"] as? String
-
         return BudgetPlan(
             id: id,
-            year: year,
-            annualSalaryGross: annualSalaryGross,
-            userIncomeId: userIncomeId,
-            categoryIds: categoryIds,
-            isActive: isActive,
-            effectiveDate: effectiveDate,
+            createdAt: createdAt,
             endDate: endDate,
-            versionNumber: versionNumber,
-            changeReason: changeReason,
-            supersededByPlanId: supersededByPlanId
+            annualSalary: annualSalary,
+            contribution401k: contribution401k,
+            federalTax: federalTax,
+            socialSecurityTax: socialSecurityTax,
+            medicareTax: medicareTax,
+            nyStateTax: nyStateTax,
+            nycTax: nycTax,
+            categoryIds: categoryIds
         )
     }
 
@@ -321,33 +369,56 @@ class BackendService: ObservableObject {
         let dateFormatter = ISO8601DateFormatter()
 
         var body: [String: Any] = [
-            "year": plan.year,
-            "annual_salary_gross": plan.annualSalaryGross,
-            "user_income_id": plan.userIncomeId,
+            "created_at": dateFormatter.string(from: plan.createdAt),
+            "annual_salary": plan.annualSalary,
+            "contribution_401k": plan.contribution401k,
+            "federal_tax": plan.federalTax,
+            "social_security_tax": plan.socialSecurityTax,
+            "medicare_tax": plan.medicareTax,
+            "ny_state_tax": plan.nyStateTax,
+            "nyc_tax": plan.nycTax,
             "category_ids": plan.categoryIds,
-            "is_active": plan.isActive,
-            "effective_date": dateFormatter.string(from: plan.effectiveDate),
-            "version_number": plan.versionNumber,
         ]
 
-        // Add optional fields
+        // Add end_date (null for active plans)
         if let endDate = plan.endDate {
             body["end_date"] = dateFormatter.string(from: endDate)
-        }
-        if let changeReason = plan.changeReason {
-            body["change_reason"] = changeReason
-        }
-        if let supersededByPlanId = plan.supersededByPlanId {
-            body["superseded_by_plan_id"] = supersededByPlanId
+        } else {
+            body["end_date"] = NSNull()
         }
 
+        print("🌐 [BackendService] Creating budget plan with body: \(body)")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
+            print("📤 [BackendService] Request body JSON: \(bodyString)")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            (200...299).contains(httpResponse.statusCode)
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ [BackendService] Invalid response type")
+            throw BackendError.invalidResponse
+        }
+
+        print("📥 [BackendService] Response status: \(httpResponse.statusCode)")
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📥 [BackendService] Response body: \(responseString)")
+        }
+
+        if !(200...299).contains(httpResponse.statusCode) {
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let errorMessage = errorJson["error"] as? String
+            {
+                print(
+                    "❌ [BackendService] Create budget plan failed (\(httpResponse.statusCode)): \(errorMessage)"
+                )
+            } else {
+                print(
+                    "❌ [BackendService] Create budget plan failed with status: \(httpResponse.statusCode)"
+                )
+            }
             throw BackendError.invalidResponse
         }
 
@@ -355,9 +426,11 @@ class BackendService: ObservableObject {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let id = json["id"] as? String
         else {
+            print("❌ [BackendService] Failed to parse response JSON or extract ID")
             throw BackendError.invalidData
         }
 
+        print("✅ [BackendService] Successfully created budget plan with ID: \(id)")
         return id
     }
 
@@ -393,166 +466,7 @@ class BackendService: ObservableObject {
             throw BackendError.invalidResponse
         }
 
-        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let id = dict["id"] as? String,
-            let year = dict["year"] as? Int,
-            let annualSalaryGross = dict["annual_salary_gross"] as? Double,
-            let userIncomeId = dict["user_income_id"] as? String,
-            let categoryIds = dict["category_ids"] as? [String],
-            let isActive = dict["is_active"] as? Bool,
-            let effectiveDateString = dict["effective_date"] as? String,
-            let versionNumber = dict["version_number"] as? Int
-        else {
-            throw BackendError.invalidData
-        }
-
-        let dateFormatter = ISO8601DateFormatter()
-        guard let effectiveDate = dateFormatter.date(from: effectiveDateString) else {
-            throw BackendError.invalidData
-        }
-
-        var endDate: Date?
-        if let endDateString = dict["end_date"] as? String {
-            endDate = dateFormatter.date(from: endDateString)
-        }
-
-        let changeReason = dict["change_reason"] as? String
-        let supersededByPlanId = dict["superseded_by_plan_id"] as? String
-
-        return BudgetPlan(
-            id: id,
-            year: year,
-            annualSalaryGross: annualSalaryGross,
-            userIncomeId: userIncomeId,
-            categoryIds: categoryIds,
-            isActive: isActive,
-            effectiveDate: effectiveDate,
-            endDate: endDate,
-            versionNumber: versionNumber,
-            changeReason: changeReason,
-            supersededByPlanId: supersededByPlanId
-        )
-    }
-
-    func supersedeBudgetPlan(oldPlanId: String, newPlanId: String, endDate: Date) async throws {
-        let url = URL(string: "\(baseURL)/budget-plans/\(oldPlanId)/supersede")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let dateFormatter = ISO8601DateFormatter()
-        let body: [String: Any] = [
-            "new_plan_id": newPlanId,
-            "end_date": dateFormatter.string(from: endDate),
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
-    }
-
-    // MARK: - User Income
-
-    func fetchUserIncome(incomeId: String) async throws -> UserIncome? {
-        let url = URL(string: "\(baseURL)/user-incomes/\(incomeId)")!
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BackendError.invalidResponse
-        }
-
-        if httpResponse.statusCode == 404 {
-            return nil
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw BackendError.invalidResponse
-        }
-
-        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let id = dict["id"] as? String,
-            let year = dict["year"] as? Int,
-            let annualSalary = dict["annual_salary"] as? Double,
-            let contribution401k = dict["contribution_401k"] as? Double,
-            let federalTax = dict["federal_tax"] as? Double,
-            let socialSecurityTax = dict["social_security_tax"] as? Double,
-            let medicareTax = dict["medicare_tax"] as? Double,
-            let nyStateTax = dict["ny_state_tax"] as? Double,
-            let nycTax = dict["nyc_tax"] as? Double
-        else {
-            throw BackendError.invalidData
-        }
-
-        return UserIncome(
-            id: id,
-            year: year,
-            annualSalary: annualSalary,
-            contribution401k: contribution401k,
-            federalTax: federalTax,
-            socialSecurityTax: socialSecurityTax,
-            medicareTax: medicareTax,
-            nyStateTax: nyStateTax,
-            nycTax: nycTax
-        )
-    }
-
-    func createUserIncome(_ income: UserIncome) async throws -> String {
-        let url = URL(string: "\(baseURL)/user-incomes")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "year": income.year,
-            "annual_salary": income.annualSalary,
-            "contribution_401k": income.contribution401k,
-            "federal_tax": income.federalTax,
-            "social_security_tax": income.socialSecurityTax,
-            "medicare_tax": income.medicareTax,
-            "ny_state_tax": income.nyStateTax,
-            "nyc_tax": income.nycTax,
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            (200...299).contains(httpResponse.statusCode)
-        else {
-            throw BackendError.invalidResponse
-        }
-
-        // Parse response to get Firestore-generated ID
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let id = json["id"] as? String
-        else {
-            throw BackendError.invalidData
-        }
-
-        return id
-    }
-
-    func updateUserIncome(incomeId: String, updates: [String: Any]) async throws {
-        let url = URL(string: "\(baseURL)/user-incomes/\(incomeId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw BackendError.invalidResponse
-        }
+        return try parseBudgetPlanResponse(data)
     }
 
     // MARK: - Funds

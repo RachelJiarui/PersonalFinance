@@ -13,32 +13,41 @@ class MonthEndBalancingViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    func loadStatsForMonth(year: Int, month: Int) {
-        guard let stats = balancingService.calculateMonthStats(year: year, month: month) else {
-            errorMessage = "Unable to calculate statistics for this month"
+    func loadStatsForMonth(year: Int, month: Int) async {
+        guard let stats = await balancingService.calculateMonthStats(year: year, month: month)
+        else {
+            await MainActor.run {
+                errorMessage = "Unable to calculate statistics for this month"
+            }
             return
         }
 
-        currentMonthStats = stats
-        currentStep = 0
-        errorMessage = nil
+        await MainActor.run {
+            currentMonthStats = stats
+            currentStep = 0
+            errorMessage = nil
+        }
     }
 
     /// Refresh stats for the current month (e.g., after editing transactions)
-    func refreshCurrentMonthStats() {
+    func refreshCurrentMonthStats() async {
         guard let stats = currentMonthStats else { return }
 
         // Recalculate stats with updated transactions
         guard
-            let newStats = balancingService.calculateMonthStats(
+            let newStats = await balancingService.calculateMonthStats(
                 year: stats.year, month: stats.month)
         else {
-            errorMessage = "Unable to refresh statistics"
+            await MainActor.run {
+                errorMessage = "Unable to refresh statistics"
+            }
             return
         }
 
         // Update stats
-        currentMonthStats = newStats
+        await MainActor.run {
+            currentMonthStats = newStats
+        }
     }
 
     // MARK: - Navigation

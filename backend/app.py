@@ -185,7 +185,7 @@ def get_budget_plans():
 
 @app.route("/api/budget-plans/active", methods=["GET"])
 def get_active_budget_plan():
-    """Get the active budget plan (current year)"""
+    """Get the active budget plan (end_date = null)"""
     try:
         plan = db.get_active_budget_plan()
         if not plan:
@@ -197,22 +197,40 @@ def get_active_budget_plan():
 
 @app.route("/api/budget-plans", methods=["POST"])
 def create_budget_plan():
-    """Create a budget plan"""
+    """
+    Create a budget plan
+
+    Validates all 4 invariants before creation
+    """
     try:
         plan_data = request.get_json()
+        print(f"📥 [API] Received budget plan data: {plan_data}")
         plan_id = db.create_budget_plan(plan_data)
         return jsonify({"success": True, "id": plan_id}), 201
+    except ValueError as e:
+        print(f"❌ [API] ValueError creating budget plan: {e}")
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
+        import traceback
+
+        print(f"❌ [API] Exception creating budget plan: {e}")
+        print(f"❌ [API] Traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/budget-plans/<plan_id>", methods=["PUT"])
 def update_budget_plan(plan_id):
-    """Update a budget plan"""
+    """
+    Update a budget plan
+
+    Note: Typically used to set end_date when creating new plan
+    """
     try:
         updates = request.get_json()
         db.update_budget_plan(plan_id, updates)
         return jsonify({"success": True}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -239,100 +257,26 @@ def get_budget_plan(plan_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/budget-plans/<plan_id>/supersede", methods=["PUT"])
-def supersede_budget_plan(plan_id):
-    """Mark a budget plan as superseded by a new plan"""
-    try:
-        data = request.get_json()
-        new_plan_id = data.get("new_plan_id")
-        end_date_str = data.get("end_date")
-
-        if not new_plan_id or not end_date_str:
-            return jsonify({"error": "Missing new_plan_id or end_date"}), 400
-
-        # Parse ISO8601 date string
-        end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-        db.supersede_budget_plan(plan_id, new_plan_id, end_date)
-
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/budget-plans/active-on/<date_str>", methods=["GET"])
+@app.route("/api/budget-plans/for-date/<date_str>", methods=["GET"])
 def get_budget_plan_for_date(date_str):
-    """Get the budget plan that was active on a specific date (ISO8601 format)"""
+    """
+    Get the budget plan that covers a specific date
+
+    Args:
+        date_str: ISO8601 date (e.g., "2025-06-15T00:00:00Z")
+
+    Returns:
+        The budget plan covering that date
+    """
     try:
         # Parse ISO8601 date string
         target_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        year = target_date.year
 
-        plan = db.get_active_budget_plan_for_date(year, target_date)
+        plan = db.get_budget_plan_for_date(target_date)
         if not plan:
             return jsonify({"error": "No budget plan found for date"}), 404
 
         return jsonify(plan), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# ============================================================================
-# USER INCOME
-# ============================================================================
-
-
-@app.route("/api/user-incomes", methods=["GET"])
-def get_user_incomes():
-    """Get user income records (query param: ?year=YYYY)"""
-    try:
-        year = request.args.get("year")
-        year = int(year) if year else None
-        incomes = db.get_user_incomes(year=year)
-        return jsonify({"incomes": incomes}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/user-incomes/<income_id>", methods=["GET"])
-def get_user_income(income_id):
-    """Get a specific user income record"""
-    try:
-        income = db.get_user_income(income_id)
-        if not income:
-            return jsonify({"error": "Income record not found"}), 404
-        return jsonify(income), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/user-incomes", methods=["POST"])
-def create_user_income():
-    """Create a user income record"""
-    try:
-        income_data = request.get_json()
-        income_id = db.create_user_income(income_data)
-        return jsonify({"success": True, "id": income_id}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/user-incomes/<income_id>", methods=["PUT"])
-def update_user_income(income_id):
-    """Update a user income record"""
-    try:
-        updates = request.get_json()
-        db.update_user_income(income_id, updates)
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/user-incomes/<income_id>", methods=["DELETE"])
-def delete_user_income(income_id):
-    """Delete a user income record"""
-    try:
-        db.delete_user_income(income_id)
-        return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

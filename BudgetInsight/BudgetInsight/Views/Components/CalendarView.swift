@@ -11,7 +11,10 @@ struct CalendarView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(snapshots) { snapshot in
-                    CalendarCell(snapshot: snapshot)
+                    NavigationLink(destination: HistoricalBudgetDetailView(snapshot: snapshot)) {
+                        CalendarCell(snapshot: snapshot)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding()

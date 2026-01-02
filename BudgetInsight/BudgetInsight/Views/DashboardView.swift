@@ -11,13 +11,13 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // Always show content, never show loading spinner
-                    if let income = BudgetService.shared.userIncome,
+                    if let budgetPlan = BudgetService.shared.budgetPlan,
                         !BudgetService.shared.getActiveCategories().isEmpty
                     {
                         BudgetRingsSection(
                             categories: BudgetService.shared.getActiveCategories(),
                             categorySpending: viewModel.categorySpending,
-                            income: income
+                            budgetPlan: budgetPlan
                         )
                     } else {
                         // Prompt to set up budget
@@ -149,7 +149,7 @@ struct HeaderView: View {
 struct BudgetRingsSection: View {
     let categories: [BudgetCategory]
     let categorySpending: [String: Double]
-    let income: UserIncome
+    let budgetPlan: BudgetPlan
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -163,7 +163,7 @@ struct BudgetRingsSection: View {
                     DashboardCategoryCard(
                         category: category,
                         currentSpent: categorySpending[category.id] ?? 0.0,
-                        monthlyTakeHome: income.monthlyTakeHome
+                        monthlyTakeHome: budgetPlan.monthlyTakeHome
                     )
                 }
             }

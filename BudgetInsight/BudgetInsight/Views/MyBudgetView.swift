@@ -61,13 +61,13 @@ struct MyBudgetView: View {
             }
 
             // MARK: - Take Home & Tax Info
-            if let income = viewModel.userIncome {
+            if let budgetPlan = viewModel.budgetPlan {
                 Section(header: Text("Take Home")) {
                     HStack {
                         Text("Annual Take Home")
                             .fontWeight(.semibold)
                         Spacer()
-                        Text("$\(Int(income.annualTakeHome))")
+                        Text("$\(Int(budgetPlan.annualTakeHome))")
                             .fontWeight(.bold)
                             .foregroundColor(.green)
                     }
@@ -76,7 +76,7 @@ struct MyBudgetView: View {
                         Text("Monthly Take Home")
                             .fontWeight(.semibold)
                         Spacer()
-                        Text("$\(Int(income.monthlyTakeHome))")
+                        Text("$\(Int(budgetPlan.monthlyTakeHome))")
                             .fontWeight(.bold)
                             .foregroundColor(.green)
                     }
@@ -85,11 +85,11 @@ struct MyBudgetView: View {
                     DisclosureGroup(
                         isExpanded: $showTaxBreakdown,
                         content: {
-                            TaxRow(label: "Federal Tax", amount: income.federalTax)
-                            TaxRow(label: "Social Security", amount: income.socialSecurityTax)
-                            TaxRow(label: "Medicare", amount: income.medicareTax)
-                            TaxRow(label: "NY State Tax", amount: income.nyStateTax)
-                            TaxRow(label: "NYC Tax", amount: income.nycTax)
+                            TaxRow(label: "Federal Tax", amount: budgetPlan.federalTax)
+                            TaxRow(label: "Social Security", amount: budgetPlan.socialSecurityTax)
+                            TaxRow(label: "Medicare", amount: budgetPlan.medicareTax)
+                            TaxRow(label: "NY State Tax", amount: budgetPlan.nyStateTax)
+                            TaxRow(label: "NYC Tax", amount: budgetPlan.nycTax)
                         },
                         label: {
                             HStack {
@@ -97,7 +97,7 @@ struct MyBudgetView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text("$\(Int(income.totalTaxes))")
+                                Text("$\(Int(budgetPlan.totalTaxes))")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -107,83 +107,84 @@ struct MyBudgetView: View {
             }
 
             // MARK: - Budget Allocation
-            if let income = viewModel.userIncome {
-                let categories =
-                    isEditing ? editCategories : viewModel.budgetCategories.filter { $0.isActive }
-                let totalPercentage = categories.reduce(0.0) { $0 + $1.percentage }
-                let remainingPercentage = 100.0 - totalPercentage
+            let categories =
+                isEditing ? editCategories : viewModel.budgetCategories.filter { $0.isActive }
+            let totalPercentage = categories.reduce(0.0) { $0 + $1.percentage }
+            let remainingPercentage = 100.0 - totalPercentage
+            let monthlyTakeHome = viewModel.budgetPlan?.monthlyTakeHome ?? 0.0
 
-                Section(
-                    header:
-                        HStack {
-                            Text("Budget Allocation")
-                            Spacer()
-                            if isEditing {
-                                Text("\(Int(totalPercentage))% allocated")
-                                    .foregroundColor(totalPercentage <= 100 ? .secondary : .red)
-                            }
-                        }
-                ) {
-                    ForEach(Array(categories.enumerated()), id: \.offset) { index, category in
+            Section(
+                header:
+                    HStack {
+                        Text("Budget Allocation")
+                        Spacer()
                         if isEditing {
-                            CategoryAllocationRow(
-                                category: category,
-                                monthlyTakeHome: income.monthlyTakeHome,
-                                isEditing: true,
-                                onUpdate: { newPercentage in
-                                    if let idx = editCategories.firstIndex(where: {
-                                        $0.id == category.id
-                                            || ($0.id.isEmpty && $0.name == category.name
-                                                && $0.icon == category.icon)
-                                    }) {
-                                        editCategories[idx].percentage = newPercentage
-                                    }
-                                }
-                            )
-                            .id("\(index)-\(category.id)-\(category.name)-\(category.icon)")
-                        } else {
-                            CategoryAllocationRow(
-                                category: category,
-                                monthlyTakeHome: income.monthlyTakeHome,
-                                isEditing: false,
-                                onUpdate: { _ in }
-                            )
+                            Text("\(Int(totalPercentage))% allocated")
+                                .foregroundColor(totalPercentage <= 100 ? .secondary : .red)
                         }
                     }
-                    .onDelete { indexSet in
-                        if isEditing {
-                            editCategories.remove(atOffsets: indexSet)
-                        }
-                    }
-
-                    // Remaining percentage display - only in edit mode
+            ) {
+                ForEach(Array(categories.enumerated()), id: \.offset) { index, category in
                     if isEditing {
-                        if remainingPercentage > 0 {
-                            HStack {
-                                Text("Unallocated")
-                                    .foregroundColor(.orange)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Text("\(String(format: "%.1f", remainingPercentage))%")
+                        CategoryAllocationRow(
+                            category: category,
+                            monthlyTakeHome: monthlyTakeHome,
+                            isEditing: true,
+                            onUpdate: { newPercentage in
+                                if let idx = editCategories.firstIndex(where: {
+                                    $0.id == category.id
+                                        || ($0.id.isEmpty && $0.name == category.name
+                                            && $0.icon == category.icon)
+                                }) {
+                                    editCategories[idx].percentage = newPercentage
+                                }
+                            }
+                        )
+                        .id("\(index)-\(category.id)-\(category.name)-\(category.icon)")
+                    } else {
+                        CategoryAllocationRow(
+                            category: category,
+                            monthlyTakeHome: monthlyTakeHome,
+                            isEditing: false,
+                            onUpdate: { _ in }
+                        )
+                    }
+                }
+                .onDelete { indexSet in
+                    if isEditing {
+                        editCategories.remove(atOffsets: indexSet)
+                    }
+                }
+
+                // Remaining percentage display - only in edit mode
+                if isEditing {
+                    if remainingPercentage > 0 {
+                        HStack {
+                            Text("Unallocated")
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("\(String(format: "%.1f", remainingPercentage))%")
+                            if monthlyTakeHome > 0 {
                                 Text(
-                                    "($\(Int(income.monthlyTakeHome * remainingPercentage / 100)))"
+                                    "($\(Int(monthlyTakeHome * remainingPercentage / 100)))"
                                 )
                                 .foregroundColor(.secondary)
                             }
-                        } else if remainingPercentage < 0 {
-                            HStack {
-                                Text("Over Allocated")
-                                    .foregroundColor(.red)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Text("\(String(format: "%.1f", abs(remainingPercentage)))%")
-                                    .foregroundColor(.red)
-                            }
                         }
+                    } else if remainingPercentage < 0 {
+                        HStack {
+                            Text("Over Allocated")
+                                .foregroundColor(.red)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("\(String(format: "%.1f", abs(remainingPercentage)))%")
+                                .foregroundColor(.red)
+                        }
+                    }
 
-                        Button(action: { showAddCategory = true }) {
-                            Label("Add Category", systemImage: "plus.circle.fill")
-                        }
+                    Button(action: { showAddCategory = true }) {
+                        Label("Add Category", systemImage: "plus.circle.fill")
                     }
                 }
             }
@@ -255,45 +256,51 @@ struct MyBudgetView: View {
     }
 
     private func saveChanges() {
-        // Save income changes
+        // Save income changes first (async)
         viewModel.annualSalaryInput = editAnnualSalary
         viewModel.contribution401kInput = editContribution401k
-        viewModel.updateIncome()
 
-        // Save category changes intelligently
-        let originalCategories = viewModel.budgetCategories.filter { $0.isActive }
+        Task {
+            // Wait for income/budget plan to be saved
+            await viewModel.updateIncome()
 
-        // 1. Find categories that were deleted (in original but not in edited)
-        for originalCategory in originalCategories {
-            if !editCategories.contains(where: { $0.id == originalCategory.id }) {
-                viewModel.deleteCategory(categoryId: originalCategory.id)
+            // Then save category changes intelligently
+            await MainActor.run {
+                let originalCategories = viewModel.budgetCategories.filter { $0.isActive }
+
+                // 1. Find categories that were deleted (in original but not in edited)
+                for originalCategory in originalCategories {
+                    if !editCategories.contains(where: { $0.id == originalCategory.id }) {
+                        viewModel.deleteCategory(categoryId: originalCategory.id)
+                    }
+                }
+
+                // 2. Update or create categories
+                for editedCategory in editCategories {
+                    if editedCategory.id.isEmpty {
+                        // New category - create it
+                        viewModel.addCategory(
+                            name: editedCategory.name,
+                            percentage: editedCategory.percentage,
+                            icon: editedCategory.icon
+                        )
+                    } else {
+                        // Existing category - update it
+                        viewModel.updateCategory(
+                            categoryId: editedCategory.id,
+                            name: editedCategory.name,
+                            percentage: editedCategory.percentage,
+                            icon: editedCategory.icon
+                        )
+                    }
+                }
+
+                isEditing = false
+                editAnnualSalary = ""
+                editContribution401k = ""
+                editCategories = []
             }
         }
-
-        // 2. Update or create categories
-        for editedCategory in editCategories {
-            if editedCategory.id.isEmpty {
-                // New category - create it
-                viewModel.addCategory(
-                    name: editedCategory.name,
-                    percentage: editedCategory.percentage,
-                    icon: editedCategory.icon
-                )
-            } else {
-                // Existing category - update it
-                viewModel.updateCategory(
-                    categoryId: editedCategory.id,
-                    name: editedCategory.name,
-                    percentage: editedCategory.percentage,
-                    icon: editedCategory.icon
-                )
-            }
-        }
-
-        isEditing = false
-        editAnnualSalary = ""
-        editContribution401k = ""
-        editCategories = []
     }
 }
 

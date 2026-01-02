@@ -282,7 +282,7 @@ struct ManualEntryView: View {
                 }
 
                 // Update snapshots
-                if let monthlyTakeHome = budgetService.userIncome?.monthlyTakeHome {
+                if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
                     await SnapshotService.shared.updateSnapshotsIfNeeded(
                         monthlyTakeHome: monthlyTakeHome,
                         transactions: storageService.transactions
