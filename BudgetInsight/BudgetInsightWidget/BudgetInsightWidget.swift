@@ -11,7 +11,13 @@ struct BudgetInsightWidget: Widget {
         }
         .configurationDisplayName("Budget Tracker")
         .description("Track your monthly budget spending at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .accessoryCircular,
+            .accessoryRectangular,
+            .accessoryInline,
+        ])
     }
 }
 
@@ -26,6 +32,12 @@ struct BudgetInsightWidgetEntryView: View {
             SmallBudgetWidget(entry: entry)
         case .systemMedium:
             MediumBudgetWidget(entry: entry)
+        case .accessoryCircular, .accessoryRectangular, .accessoryInline:
+            if #available(iOS 16.0, *) {
+                LockScreenBudgetWidget(entry: entry)
+            } else {
+                SmallBudgetWidget(entry: entry)
+            }
         default:
             SmallBudgetWidget(entry: entry)
         }

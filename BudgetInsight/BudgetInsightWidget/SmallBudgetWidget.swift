@@ -24,10 +24,10 @@ struct SmallBudgetWidget: View {
     var body: some View {
         if #available(iOS 17.0, *) {
             contentView
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(.fill.quaternary, for: .widget)
         } else {
             ZStack {
-                Color(.systemBackground)
+                Color(.systemFill)
                 contentView
             }
         }

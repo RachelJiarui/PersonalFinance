@@ -46,7 +46,7 @@ struct CategoryCircleWithLabel: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 10) {
             ZStack {
                 // Background circle
                 Circle()
@@ -68,7 +68,7 @@ struct CategoryCircleWithLabel: View {
 
             // Percentage under circle
             Text("\(Int(category.spendingRatio * 100))%")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
         }
     }
