@@ -11,13 +11,18 @@ struct BudgetCategory: Identifiable, Codable, Equatable {
     var percentage: Double  // 0-100, can edit if isActive = true
     var icon: String  // SF Symbol name, can edit if isActive = true
     var isActive: Bool  // Once false, category becomes immutable
+    var isStarred: Bool  // Whether this category is pinned/starred
 
-    init(id: String = "", name: String, percentage: Double, icon: String, isActive: Bool = true) {
+    init(
+        id: String = "", name: String, percentage: Double, icon: String, isActive: Bool = true,
+        isStarred: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.percentage = percentage
         self.icon = icon
         self.isActive = isActive
+        self.isStarred = isStarred
     }
 
     // Helper methods for budget calculations

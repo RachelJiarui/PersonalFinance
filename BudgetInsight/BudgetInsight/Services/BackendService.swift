@@ -187,13 +187,15 @@ class BackendService: ObservableObject {
                 let icon = dict["icon"] as? String,
                 let isActive = dict["is_active"] as? Bool
             {
+                let isStarred = dict["is_starred"] as? Bool ?? false
 
                 let category = BudgetCategory(
                     id: id,
                     name: name,
                     percentage: percentage,
                     icon: icon,
-                    isActive: isActive
+                    isActive: isActive,
+                    isStarred: isStarred
                 )
                 categories.append(category)
             }
@@ -213,6 +215,7 @@ class BackendService: ObservableObject {
             "percentage": category.percentage,
             "icon": category.icon,
             "is_active": category.isActive,
+            "is_starred": category.isStarred,
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

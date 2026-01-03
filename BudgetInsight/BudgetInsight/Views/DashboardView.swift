@@ -151,6 +151,16 @@ struct BudgetRingsSection: View {
     let categorySpending: [String: Double]
     let budgetPlan: BudgetPlan
 
+    // Sort categories: starred first, then by name
+    var sortedCategories: [BudgetCategory] {
+        categories.sorted { lhs, rhs in
+            if lhs.isStarred != rhs.isStarred {
+                return lhs.isStarred  // Starred categories come first
+            }
+            return lhs.name < rhs.name  // Then alphabetically
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             LazyVGrid(
@@ -159,7 +169,7 @@ struct BudgetRingsSection: View {
                     GridItem(.flexible()),
                 ], spacing: 20
             ) {
-                ForEach(categories) { category in
+                ForEach(sortedCategories) { category in
                     DashboardCategoryCard(
                         category: category,
                         currentSpent: categorySpending[category.id] ?? 0.0,

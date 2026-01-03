@@ -477,6 +477,27 @@ class BudgetService: ObservableObject {
         }
     }
 
+    func toggleCategoryStarred(categoryId: String) {
+        if let index = budgetCategories.firstIndex(where: { $0.id == categoryId }) {
+            budgetCategories[index].isStarred.toggle()
+            let newStarredValue = budgetCategories[index].isStarred
+            saveBudgetCategories()
+
+            // Update in Firestore
+            Task {
+                do {
+                    try await BackendService.shared.updateBudgetCategory(
+                        categoryId: categoryId,
+                        updates: ["is_starred": newStarredValue]
+                    )
+                    print("✅ [BudgetService] Updated category starred status in Firestore")
+                } catch {
+                    print("❌ [BudgetService] Error updating category starred status: \(error)")
+                }
+            }
+        }
+    }
+
     func deleteCategory(categoryId: String) {
         // Mark as inactive instead of deleting (for historical data integrity)
         if let index = budgetCategories.firstIndex(where: { $0.id == categoryId }) {

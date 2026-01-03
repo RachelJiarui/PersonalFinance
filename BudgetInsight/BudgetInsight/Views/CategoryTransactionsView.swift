@@ -38,39 +38,48 @@ struct CategoryTransactionsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
+                // Summary header - always visible
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: category.icon)
+                            .font(.title2)
+                            .foregroundColor(.blue)
+
+                        Text(category.name)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+
+                        Spacer()
+
+                        Button(action: {
+                            budgetService.toggleCategoryStarred(categoryId: category.id)
+                        }) {
+                            Image(systemName: category.isStarred ? "pin.fill" : "pin")
+                                .font(.title3)
+                                .foregroundColor(category.isStarred ? .blue : .gray)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    HStack {
+                        Text(
+                            "\(sortedTransactions.count) transaction\(sortedTransactions.count == 1 ? "" : "s")"
+                        )
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                        Spacer()
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+
+                Divider()
+
                 if sortedTransactions.isEmpty {
                     EmptyCategoryTransactionsView(categoryName: category.name)
                         .padding(.top, 60)
                 } else {
-                    // Summary header
-                    VStack(spacing: 8) {
-                        HStack {
-                            Image(systemName: category.icon)
-                                .font(.title2)
-                                .foregroundColor(.blue)
-
-                            Text(category.name)
-                                .font(.title2)
-                                .fontWeight(.semibold)
-
-                            Spacer()
-                        }
-
-                        HStack {
-                            Text(
-                                "\(sortedTransactions.count) transaction\(sortedTransactions.count == 1 ? "" : "s")"
-                            )
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-
-                            Spacer()
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-
-                    Divider()
-
                     // Transactions list
                     ForEach(displayedTransactions) { transaction in
                         NavigationLink(
@@ -107,7 +116,6 @@ struct CategoryTransactionsView: View {
                 }
             }
         }
-        .navigationTitle("Category Transactions")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             // Reset pagination when leaving the view

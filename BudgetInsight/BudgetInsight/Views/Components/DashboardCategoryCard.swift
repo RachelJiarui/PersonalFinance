@@ -42,6 +42,12 @@ struct DashboardCategoryCard: View {
             VStack(spacing: 12) {
                 // Category icon and name
                 HStack(alignment: .top) {
+                    if category.isStarred {
+                        Image(systemName: "pin.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+
                     Image(systemName: category.icon)
                         .font(.title3)
                         .foregroundColor(.blue)
