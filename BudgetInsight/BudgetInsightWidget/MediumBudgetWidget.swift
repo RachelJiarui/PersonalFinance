@@ -18,42 +18,23 @@ struct MediumBudgetWidget: View {
     }
 
     private var contentView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Categories row with circular progress indicators
-            HStack(spacing: 16) {
-                ForEach(entry.starredCategories.prefix(4)) { category in
-                    CategoryCircle(category: category)
-                }
-
-                // Fill remaining space with empty circles if less than 4 categories
-                ForEach(entry.starredCategories.count..<4, id: \.self) { _ in
-                    EmptyCircle()
-                }
+        HStack(spacing: 12) {
+            ForEach(entry.starredCategories.prefix(4)) { category in
+                CategoryCircleWithLabel(category: category)
             }
-            .padding(.horizontal, 20)
 
-            // Percentage display (showing first category's percentage, or overall if none)
-            HStack {
-                if let firstCategory = entry.starredCategories.first {
-                    Text("\(Int(firstCategory.spendingRatio * 100))%")
-                        .font(.system(size: 36, weight: .regular, design: .rounded))
-                        .foregroundColor(.primary)
-                } else {
-                    Text("\(Int(entry.spendingRatio * 100))%")
-                        .font(.system(size: 36, weight: .regular, design: .rounded))
-                        .foregroundColor(.primary)
-                }
-                Spacer()
+            // Fill remaining space with empty circles if less than 4 categories
+            ForEach(entry.starredCategories.count..<4, id: \.self) { _ in
+                EmptyCircleWithLabel()
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
         }
+        .padding(.horizontal, 16)
         .padding(.vertical, 16)
     }
 }
 
-/// Single category circular progress indicator
-struct CategoryCircle: View {
+/// Category circle with percentage label
+struct CategoryCircleWithLabel: View {
     let category: CategoryWidgetData
 
     private var color: Color {
@@ -65,33 +46,46 @@ struct CategoryCircle: View {
     }
 
     var body: some View {
-        ZStack {
-            // Background circle
-            Circle()
-                .stroke(Color.gray.opacity(0.3), lineWidth: 6)
-                .frame(width: 60, height: 60)
+        VStack(spacing: 6) {
+            ZStack {
+                // Background circle
+                Circle()
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 7)
+                    .frame(width: 70, height: 70)
 
-            // Progress ring
-            Circle()
-                .trim(from: 0, to: min(category.spendingRatio, 1.0))
-                .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .frame(width: 60, height: 60)
-                .rotationEffect(.degrees(-90))
+                // Progress ring
+                Circle()
+                    .trim(from: 0, to: min(category.spendingRatio, 1.0))
+                    .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .frame(width: 70, height: 70)
+                    .rotationEffect(.degrees(-90))
 
-            // Icon in center
-            Image(systemName: category.icon)
-                .font(.system(size: 20))
+                // Icon in center
+                Image(systemName: category.icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(.primary)
+            }
+
+            // Percentage under circle
+            Text("\(Int(category.spendingRatio * 100))%")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
         }
     }
 }
 
-/// Empty circle placeholder
-struct EmptyCircle: View {
+/// Empty circle with label placeholder
+struct EmptyCircleWithLabel: View {
     var body: some View {
-        Circle()
-            .stroke(Color.gray.opacity(0.3), lineWidth: 6)
-            .frame(width: 60, height: 60)
+        VStack(spacing: 6) {
+            Circle()
+                .stroke(Color.gray.opacity(0.3), lineWidth: 7)
+                .frame(width: 70, height: 70)
+
+            Text("")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(.clear)
+        }
     }
 }
 
