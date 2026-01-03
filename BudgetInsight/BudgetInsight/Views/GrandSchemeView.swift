@@ -24,7 +24,7 @@ struct GrandSchemeView: View {
                     )
 
                     TabButton(
-                        title: "Expenditures Overview",
+                        title: "Historical Data",
                         isSelected: selectedTab == .expenditureOverview,
                         action: { selectedTab = .expenditureOverview }
                     )

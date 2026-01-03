@@ -131,7 +131,42 @@ class DashboardViewModel: ObservableObject {
             // Fetch active budget plan
             print("📥 [DashboardViewModel] Fetching budget plan from backend...")
             if let plan = try await backendService.fetchActiveBudgetPlan() {
-                budgetService.budgetPlan = plan
+                // Check if there are active categories missing from the plan
+                let activeCategoryIds = backendCategories.filter { $0.isActive }.map { $0.id }
+                let missingCategoryIds = activeCategoryIds.filter { !plan.categoryIds.contains($0) }
+
+                if !missingCategoryIds.isEmpty {
+                    print(
+                        "⚠️ [DashboardViewModel] Found \(missingCategoryIds.count) active categories not in budget plan, updating plan..."
+                    )
+                    let updatedCategoryIds = plan.categoryIds + missingCategoryIds
+
+                    // Update plan in backend
+                    try await backendService.updateBudgetPlan(
+                        planId: plan.id,
+                        updates: ["category_ids": updatedCategoryIds]
+                    )
+
+                    // Update local plan
+                    let updatedPlan = BudgetPlan(
+                        id: plan.id,
+                        createdAt: plan.createdAt,
+                        endDate: plan.endDate,
+                        annualSalary: plan.annualSalary,
+                        contribution401k: plan.contribution401k,
+                        federalTax: plan.federalTax,
+                        socialSecurityTax: plan.socialSecurityTax,
+                        medicareTax: plan.medicareTax,
+                        nyStateTax: plan.nyStateTax,
+                        nycTax: plan.nycTax,
+                        categoryIds: updatedCategoryIds
+                    )
+                    budgetService.budgetPlan = updatedPlan
+                    print("✅ [DashboardViewModel] Updated budget plan with missing categories")
+                } else {
+                    budgetService.budgetPlan = plan
+                }
+
                 budgetService.updateCategorySpending(with: storageService.transactions)
                 print("✅ [DashboardViewModel] Fetched budget plan from backend")
             } else {

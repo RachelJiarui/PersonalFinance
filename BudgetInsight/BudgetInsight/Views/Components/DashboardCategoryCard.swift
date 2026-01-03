@@ -36,54 +36,62 @@ struct DashboardCategoryCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Category icon and name
-            HStack {
-                Image(systemName: category.icon)
-                    .font(.title3)
-                    .foregroundColor(.blue)
+        NavigationLink(
+            destination: CategoryTransactionsView(category: category)
+        ) {
+            VStack(spacing: 12) {
+                // Category icon and name
+                HStack(alignment: .top) {
+                    Image(systemName: category.icon)
+                        .font(.title3)
+                        .foregroundColor(.blue)
 
-                Text(category.name)
-                    .font(.headline)
-                    .lineLimit(1)
+                    Text(category.name)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundColor(.primary)
 
-                Spacer()
-            }
+                    Spacer()
+                }
 
-            // Circular progress ring
-            ZStack {
-                CircularProgressRing(
-                    progress: spendingRatio,
-                    color: ringColor,
-                    lineWidth: 10
-                )
-                .frame(width: 100, height: 100)
+                // Circular progress ring
+                ZStack {
+                    CircularProgressRing(
+                        progress: spendingRatio,
+                        color: ringColor,
+                        lineWidth: 10
+                    )
+                    .frame(width: 100, height: 100)
 
-                VStack(spacing: 2) {
-                    Text("\(Int(spendingRatio * 100))%")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    VStack(spacing: 2) {
+                        Text("\(Int(spendingRatio * 100))%")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
 
-                    Text("spent")
+                        Text("spent")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // Budget details
+                VStack(spacing: 4) {
+                    Text("$\(Int(currentSpent)) / $\(Int(budget))")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+
+                    Text("$\(Int(max(0, budget - currentSpent))) remaining")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(ringColor)
                 }
             }
-
-            // Budget details
-            VStack(spacing: 4) {
-                Text("$\(Int(currentSpent)) / $\(Int(budget))")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text("$\(Int(max(0, budget - currentSpent))) remaining")
-                    .font(.caption)
-                    .foregroundColor(ringColor)
-            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .buttonStyle(PlainButtonStyle())
     }
 }

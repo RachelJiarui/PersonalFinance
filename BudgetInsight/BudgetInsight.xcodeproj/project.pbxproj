@@ -28,6 +28,7 @@
 		879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E0DAAE7F3A4695195AF185 /* PerennialView.swift */; };
 		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
 		CC5437AC2F08344D0083C0D9 /* HistoricalBudgetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */; };
+		CC5437AE2F08A7450083C0D9 /* CategoryTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */; };
 		CC762D2D2F0383EE00DB650A /* EditTransactionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */; };
 		CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192182EFF46B90053873B /* PeriodSnapshot.swift */; };
 		CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
@@ -80,6 +81,7 @@
 		BA4D4D040B401A2E2324017C /* FundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundService.swift; sourceTree = "<group>"; };
 		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
 		CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoricalBudgetDetailView.swift; sourceTree = "<group>"; };
+		CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryTransactionsView.swift; sourceTree = "<group>"; };
 		CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTransactionView.swift; sourceTree = "<group>"; };
 		CCF192172EFF46B90053873B /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
 		CCF192182EFF46B90053873B /* PeriodSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodSnapshot.swift; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 		1A00001E /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */,
 				CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */,
 				CCF2FC3F2F06414C00DC07DC /* BackendRegistrationView.swift */,
 				CCF2FC452F06414C00DC07DC /* MonthEnd */,
@@ -344,6 +347,7 @@
 				CCF1922A2EFF46E10053873B /* MainTabView.swift in Sources */,
 				CCF1922B2EFF46E10053873B /* GraphView.swift in Sources */,
 				CCF1922C2EFF46E10053873B /* GrandSchemeView.swift in Sources */,
+				CC5437AE2F08A7450083C0D9 /* CategoryTransactionsView.swift in Sources */,
 				1A000038 /* KeychainService.swift in Sources */,
 				1A000039 /* BudgetService.swift in Sources */,
 				1A00003A /* CategoryCard.swift in Sources */,
