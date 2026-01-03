@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -29,7 +29,16 @@
 		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
 		CC5437AC2F08344D0083C0D9 /* HistoricalBudgetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */; };
 		CC5437AE2F08A7450083C0D9 /* CategoryTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */; };
+		CC5437B62F08CC430083C0D9 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC5437B52F08CC430083C0D9 /* WidgetKit.framework */; };
+		CC5437B82F08CC430083C0D9 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC5437B72F08CC430083C0D9 /* SwiftUI.framework */; };
+		CC5437C92F08CC450083C0D9 /* BudgetInsightWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC5437B32F08CC430083C0D9 /* BudgetInsightWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CC5437EB2F08CDA80083C0D9 /* SharedUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */; };
+		CC5437EC2F08CF430083C0D9 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C /* Transaction.swift */; };
+		CC5437EE2F08CF430083C0D9 /* TransactionAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */; };
+		CC5437EF2F08CF430083C0D9 /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
+		CC5437F02F08CF430083C0D9 /* BudgetPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192372EFFNEW1 /* BudgetPlan.swift */; };
 		CC762D2D2F0383EE00DB650A /* EditTransactionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */; };
+		CCA4CD4E2F08E2F40066034F /* SharedUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */; };
 		CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192182EFF46B90053873B /* PeriodSnapshot.swift */; };
 		CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
 		CCF1921E2EFFNEW1 /* BudgetPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192372EFFNEW1 /* BudgetPlan.swift */; };
@@ -59,6 +68,30 @@
 		CF8860D17823D2D67FC6BE07 /* FundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA4D4D040B401A2E2324017C /* FundService.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CC5437C72F08CC450083C0D9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A000025 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC5437B22F08CC430083C0D9;
+			remoteInfo = BudgetInsightWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CC5437CE2F08CC450083C0D9 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CC5437C92F08CC450083C0D9 /* BudgetInsightWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		049950824A4A647CD9DCBF71 /* Debt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debt.swift; sourceTree = "<group>"; };
 		1A000001 /* BudgetInsight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetInsight.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -82,7 +115,14 @@
 		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
 		CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoricalBudgetDetailView.swift; sourceTree = "<group>"; };
 		CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryTransactionsView.swift; sourceTree = "<group>"; };
+		CC5437B32F08CC430083C0D9 /* BudgetInsightWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgetInsightWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC5437B52F08CC430083C0D9 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		CC5437B72F08CC430083C0D9 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUserDefaults.swift; sourceTree = "<group>"; };
 		CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTransactionView.swift; sourceTree = "<group>"; };
+		CCA4CD4F2F08E3DB0066034F /* BudgetInsightWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BudgetInsightWidgetExtension.entitlements; sourceTree = "<group>"; };
+		CCA4CD502F08E4060066034F /* BudgetInsight.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BudgetInsight.entitlements; sourceTree = "<group>"; };
+		CCA794EE2F08EBD000106919 /* BudgetInsightWidgetExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "BudgetInsightWidgetExtension-Info.plist"; sourceTree = "<group>"; };
 		CCF192172EFF46B90053873B /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
 		CCF192182EFF46B90053873B /* PeriodSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodSnapshot.swift; sourceTree = "<group>"; };
 		CCF1921E2EFF46E10053873B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
@@ -113,11 +153,24 @@
 		DF9DBF7F264C2F518E52B125 /* DebtService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		CC5437B92F08CC430083C0D9 /* BudgetInsightWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = BudgetInsightWidget; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		1A000019 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC5437B02F08CC430083C0D9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC5437B82F08CC430083C0D9 /* SwiftUI.framework in Frameworks */,
+				CC5437B62F08CC430083C0D9 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +180,8 @@
 		1A00001B /* BudgetInsight */ = {
 			isa = PBXGroup;
 			children = (
+				CCA4CD502F08E4060066034F /* BudgetInsight.entitlements */,
+				CC5437EA2F08CDA80083C0D9 /* Utilities */,
 				1A000002 /* BudgetInsightApp.swift */,
 				1A00001D /* Models */,
 				1A00001E /* Views */,
@@ -141,6 +196,7 @@
 			isa = PBXGroup;
 			children = (
 				1A000001 /* BudgetInsight.app */,
+				CC5437B32F08CC430083C0D9 /* BudgetInsightWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -218,9 +274,30 @@
 		1A00003D = {
 			isa = PBXGroup;
 			children = (
+				CCA794EE2F08EBD000106919 /* BudgetInsightWidgetExtension-Info.plist */,
+				CCA4CD4F2F08E3DB0066034F /* BudgetInsightWidgetExtension.entitlements */,
 				1A00001B /* BudgetInsight */,
+				CC5437B92F08CC430083C0D9 /* BudgetInsightWidget */,
+				CC5437B42F08CC430083C0D9 /* Frameworks */,
 				1A00001C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		CC5437B42F08CC430083C0D9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				CC5437B52F08CC430083C0D9 /* WidgetKit.framework */,
+				CC5437B72F08CC430083C0D9 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		CC5437EA2F08CDA80083C0D9 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		CCF192222EFF46E10053873B /* Components */ = {
@@ -255,10 +332,12 @@
 				1A000023 /* Sources */,
 				1A000019 /* Frameworks */,
 				1A000024 /* Resources */,
+				CC5437CE2F08CC450083C0D9 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CC5437C82F08CC450083C0D9 /* PBXTargetDependency */,
 			);
 			name = BudgetInsight;
 			packageProductDependencies = (
@@ -267,6 +346,28 @@
 			productReference = 1A000001 /* BudgetInsight.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CC5437B22F08CC430083C0D9 /* BudgetInsightWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CC5437CB2F08CC450083C0D9 /* Build configuration list for PBXNativeTarget "BudgetInsightWidgetExtension" */;
+			buildPhases = (
+				CC5437AF2F08CC430083C0D9 /* Sources */,
+				CC5437B02F08CC430083C0D9 /* Frameworks */,
+				CC5437B12F08CC430083C0D9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CC5437B92F08CC430083C0D9 /* BudgetInsightWidget */,
+			);
+			name = BudgetInsightWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = BudgetInsightWidgetExtension;
+			productReference = CC5437B32F08CC430083C0D9 /* BudgetInsightWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -274,11 +375,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					1A000021 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					CC5437B22F08CC430083C0D9 = {
+						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
@@ -296,6 +400,7 @@
 			projectRoot = "";
 			targets = (
 				1A000021 /* BudgetInsight */,
+				CC5437B22F08CC430083C0D9 /* BudgetInsightWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -306,6 +411,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A000032 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC5437B12F08CC430083C0D9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,10 +477,31 @@
 				4731ECEAC2C7CCF59B3E2F1A /* FundDetailView.swift in Sources */,
 				4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */,
 				91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */,
+				CC5437EB2F08CDA80083C0D9 /* SharedUserDefaults.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC5437AF2F08CC430083C0D9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CCA4CD4E2F08E2F40066034F /* SharedUserDefaults.swift in Sources */,
+				CC5437EC2F08CF430083C0D9 /* Transaction.swift in Sources */,
+				CC5437EE2F08CF430083C0D9 /* TransactionAllocation.swift in Sources */,
+				CC5437EF2F08CF430083C0D9 /* BudgetCategory.swift in Sources */,
+				CC5437F02F08CF430083C0D9 /* BudgetPlan.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CC5437C82F08CC450083C0D9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC5437B22F08CC430083C0D9 /* BudgetInsightWidgetExtension */;
+			targetProxy = CC5437C72F08CC450083C0D9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1A000027 /* Debug */ = {
@@ -405,6 +538,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = BudgetInsight/BudgetInsight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -485,6 +619,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = BudgetInsight/BudgetInsight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -525,6 +660,89 @@
 			};
 			name = Release;
 		};
+		CC5437CC2F08CC450083C0D9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = BudgetInsightWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WP7LUUC385;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BudgetInsightWidgetExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetInsightWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app.BudgetInsightWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CC5437CD2F08CC450083C0D9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = BudgetInsightWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WP7LUUC385;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BudgetInsightWidgetExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetInsightWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app.BudgetInsightWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -542,6 +760,15 @@
 			buildConfigurations = (
 				1A000027 /* Debug */,
 				1A000028 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CC5437CB2F08CC450083C0D9 /* Build configuration list for PBXNativeTarget "BudgetInsightWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC5437CC2F08CC450083C0D9 /* Debug */,
+				CC5437CD2F08CC450083C0D9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

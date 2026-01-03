@@ -5,7 +5,7 @@ class AllocationService: ObservableObject {
 
     @Published var allocations: [TransactionAllocation] = []
 
-    private let userDefaults = UserDefaults.standard
+    private let userDefaults = SharedUserDefaults.shared
     private let allocationsKey = "transaction_allocations"
     private let calendar = Calendar.current
 

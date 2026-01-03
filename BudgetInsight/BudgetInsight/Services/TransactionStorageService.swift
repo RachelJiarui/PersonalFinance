@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import WidgetKit
 
 /// Handles local persistence of transactions
 /// NOTE: Currently uses UserDefaults for local storage. Prepared for future backend API integration (EC2).
@@ -27,7 +28,7 @@ class TransactionStorageService: ObservableObject {
 
     /// Load all transactions from local storage
     func loadTransactions() {
-        guard let data = UserDefaults.standard.data(forKey: transactionsKey) else {
+        guard let data = SharedUserDefaults.shared.data(forKey: transactionsKey) else {
             transactions = []
             print("⚠️ [TransactionStorageService] No transactions found in local storage")
             return
@@ -72,7 +73,8 @@ class TransactionStorageService: ObservableObject {
     func persistTransactions() {
         do {
             let data = try JSONEncoder().encode(transactions)
-            UserDefaults.standard.set(data, forKey: transactionsKey)
+            SharedUserDefaults.shared.set(data, forKey: transactionsKey)
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             print("Failed to encode transactions: \(error)")
         }

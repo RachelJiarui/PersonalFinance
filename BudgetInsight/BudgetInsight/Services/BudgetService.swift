@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import WidgetKit
 
 class BudgetService: ObservableObject {
     static let shared = BudgetService()
@@ -11,7 +12,7 @@ class BudgetService: ObservableObject {
     // Category spending tracking (categoryId -> amount spent this month)
     @Published var categorySpending: [String: Double] = [:]
 
-    private let userDefaults = UserDefaults.standard
+    private let userDefaults = SharedUserDefaults.shared
     private let budgetPlanKey = "budget_plan"
     private let categoriesKey = "budget_categories"
     private var cancellables = Set<AnyCancellable>()
@@ -692,6 +693,7 @@ class BudgetService: ObservableObject {
     private func saveBudgetPlan() {
         if let encoded = try? JSONEncoder().encode(budgetPlan) {
             userDefaults.set(encoded, forKey: budgetPlanKey)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
@@ -706,6 +708,7 @@ class BudgetService: ObservableObject {
     func saveBudgetCategories() {
         if let encoded = try? JSONEncoder().encode(budgetCategories) {
             userDefaults.set(encoded, forKey: categoriesKey)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
