@@ -21,13 +21,8 @@ class AllocationService: ObservableObject {
     // MARK: - Firestore Data Fetching
 
     func fetchDataFromFirestore() async {
-        print("🔄 [AllocationService] Fetching allocations from Firestore...")
-
         do {
             let firestoreAllocations = try await BackendService.shared.fetchAllocations()
-            print(
-                "✅ [AllocationService] Fetched \(firestoreAllocations.count) allocations from Firestore"
-            )
 
             await MainActor.run {
                 // Merge Firestore data with local data instead of replacing
@@ -37,14 +32,9 @@ class AllocationService: ObservableObject {
                 // Combine: Firestore allocations + local-only allocations
                 self.allocations = firestoreAllocations + localOnlyAllocations
                 self.saveAllocations()
-
-                print(
-                    "📊 [AllocationService] Total allocations after merge: \(self.allocations.count)"
-                )
             }
         } catch {
-            print("❌ [AllocationService] Error fetching allocations from Firestore: \(error)")
-            print("⚠️ [AllocationService] Using local data only. Backend may not be deployed.")
+            print("❌ [AllocationService] Error fetching allocations: \(error)")
             // Don't clear local allocations on error - keep what we have
         }
     }
@@ -58,14 +48,6 @@ class AllocationService: ObservableObject {
         amount: Double,
         isExpense: Bool? = nil
     ) -> TransactionAllocation {
-        // Validate that the destination exists
-        let isValid = validateDestination(type: destinationType, id: destinationId)
-        if !isValid {
-            print("⚠️ [AllocationService] WARNING: Creating allocation with invalid destination!")
-            print("   Type: \(destinationType.rawValue), ID: \(destinationId)")
-            print("   Transaction ID: \(transactionId), Amount: $\(amount)")
-        }
-
         let newAllocation = TransactionAllocation(
             id: "",  // Firestore will generate this
             transactionId: transactionId,
@@ -82,16 +64,13 @@ class AllocationService: ObservableObject {
         Task {
             do {
                 let firestoreId = try await BackendService.shared.createAllocation(newAllocation)
-                print(
-                    "✅ [AllocationService] Created Allocation in Firestore with ID: \(firestoreId)"
-                )
 
                 await MainActor.run {
                     self.updateAllocationWithId(
                         tempAllocation: newAllocation, firestoreId: firestoreId)
                 }
             } catch {
-                print("❌ [AllocationService] Error creating Allocation in Firestore: \(error)")
+                print("❌ [AllocationService] Error creating allocation: \(error)")
             }
         }
 
@@ -151,9 +130,8 @@ class AllocationService: ObservableObject {
                         allocationId: allocationId,
                         updates: ["amount": amount]
                     )
-                    print("✅ [AllocationService] Updated Allocation in Firestore")
                 } catch {
-                    print("❌ [AllocationService] Error updating Allocation in Firestore: \(error)")
+                    print("❌ [AllocationService] Error updating allocation: \(error)")
                 }
             }
 
@@ -172,14 +150,8 @@ class AllocationService: ObservableObject {
     }
 
     func deleteAllocation(allocationId: String) {
-        print("🔍 [AllocationService] Attempting to delete allocation: \(allocationId)")
-
         if let index = allocations.firstIndex(where: { $0.id == allocationId }) {
             let allocation = allocations[index]
-
-            print(
-                "🔍 [AllocationService] Found allocation: type=\(allocation.destinationType), amount=$\(allocation.amount)"
-            )
 
             // Get transaction type
             let transaction = TransactionStorageService.shared.transactions.first {
@@ -187,14 +159,7 @@ class AllocationService: ObservableObject {
             }
             let isExpense = transaction?.isExpense ?? true
 
-            print(
-                "🔍 [AllocationService] Transaction found: \(transaction != nil), isExpense: \(isExpense)"
-            )
-
             // Reverse the balance change
-            print(
-                "🔍 [AllocationService] Reversing balance: type=\(allocation.destinationType), amount=-\(allocation.amount)"
-            )
             updateDestinationBalance(
                 destinationType: allocation.destinationType,
                 destinationId: allocation.destinationId,
@@ -205,19 +170,14 @@ class AllocationService: ObservableObject {
             allocations.remove(at: index)
             saveAllocations()
 
-            print("✅ [AllocationService] Deleted allocation locally and reversed balance")
-
             // Delete from Firestore
             Task {
                 do {
                     try await BackendService.shared.deleteAllocation(allocationId)
-                    print("✅ [AllocationService] Deleted Allocation from Firestore")
                 } catch {
-                    print("❌ [AllocationService] Error deleting Allocation: \(error)")
+                    print("❌ [AllocationService] Error deleting allocation: \(error)")
                 }
             }
-        } else {
-            print("⚠️ [AllocationService] Allocation not found: \(allocationId)")
         }
     }
 
@@ -335,10 +295,6 @@ class AllocationService: ObservableObject {
             let decoded = try? JSONDecoder().decode([TransactionAllocation].self, from: data)
         {
             allocations = decoded
-            print(
-                "💾 [AllocationService] Loaded \(allocations.count) allocations from local storage")
-        } else {
-            print("⚠️ [AllocationService] No allocations found in local storage")
         }
     }
 }

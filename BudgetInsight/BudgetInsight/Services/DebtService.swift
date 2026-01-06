@@ -26,8 +26,6 @@ class DebtService: ObservableObject {
         let hasDefaultDebt = debts.contains { $0.isDefault && $0.name == "General Debt" }
 
         if !hasDefaultDebt {
-            print("🔄 [DebtService] Creating default General Debt...")
-
             let defaultDebt = Debt(
                 id: "",
                 name: "General Debt",
@@ -44,7 +42,6 @@ class DebtService: ObservableObject {
             // Save to Firestore
             do {
                 let firestoreId = try await BackendService.shared.createDebt(defaultDebt)
-                print("✅ [DebtService] Created default debt in Firestore with ID: \(firestoreId)")
 
                 await MainActor.run {
                     let debtWithId = Debt(
@@ -68,8 +65,6 @@ class DebtService: ObservableObject {
             } catch {
                 print("❌ [DebtService] Error creating default debt: \(error)")
             }
-        } else {
-            print("✅ [DebtService] Default General Debt already exists")
         }
     }
 
@@ -80,31 +75,16 @@ class DebtService: ObservableObject {
     // MARK: - Firestore Data Fetching
 
     func fetchDataFromFirestore() async {
-        print("🔄 [DebtService] Fetching debts from Firestore...")
-
         do {
             let firestoreDebts = try await BackendService.shared.fetchDebts()
-            print("✅ [DebtService] Fetched \(firestoreDebts.count) debts from Firestore")
-
-            // Debug: Print details of fetched debts
-            for debt in firestoreDebts {
-                print(
-                    "   - Debt: \(debt.name), ID: \(debt.id), Active: \(debt.isActive), Balance: \(debt.balance)"
-                )
-            }
 
             await MainActor.run {
                 // Replace with Firestore data as source of truth
                 self.debts = firestoreDebts
                 self.saveDebts()
-
-                print("📊 [DebtService] Total debts: \(self.debts.count)")
-                print("📊 [DebtService] Active debts: \(self.getActiveDebts().count)")
             }
         } catch {
-            print("❌ [DebtService] Error fetching debts from Firestore: \(error)")
-            print(
-                "⚠️ [DebtService] Using local data only. Make sure backend is deployed and running.")
+            print("❌ [DebtService] Error fetching debts: \(error)")
             // Continue using local data - don't clear the array
         }
     }
@@ -135,7 +115,6 @@ class DebtService: ObservableObject {
         Task {
             do {
                 let firestoreId = try await BackendService.shared.createDebt(newDebt)
-                print("✅ [DebtService] Created Debt in Firestore with ID: \(firestoreId)")
 
                 await MainActor.run {
                     // Create debt with actual Firestore ID
@@ -205,9 +184,8 @@ class DebtService: ObservableObject {
                 Task {
                     do {
                         try await BackendService.shared.updateDebt(debtId: debtId, updates: updates)
-                        print("✅ [DebtService] Updated Debt in Firestore")
                     } catch {
-                        print("❌ [DebtService] Error updating Debt in Firestore: \(error)")
+                        print("❌ [DebtService] Error updating debt: \(error)")
                     }
                 }
             }
@@ -236,9 +214,8 @@ class DebtService: ObservableObject {
                         debtId: debtId,
                         updates: ["balance": newBalance]
                     )
-                    print("✅ [DebtService] Updated Debt balance in Firestore")
                 } catch {
-                    print("❌ [DebtService] Error updating Debt balance in Firestore: \(error)")
+                    print("❌ [DebtService] Error updating debt balance: \(error)")
                 }
             }
         }
@@ -262,9 +239,8 @@ class DebtService: ObservableObject {
             Task {
                 do {
                     try await BackendService.shared.deleteDebt(debtId)
-                    print("✅ [DebtService] Marked Debt as inactive in Firestore")
                 } catch {
-                    print("❌ [DebtService] Error deleting Debt: \(error)")
+                    print("❌ [DebtService] Error deleting debt: \(error)")
                 }
             }
         }

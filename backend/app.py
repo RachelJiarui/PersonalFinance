@@ -7,9 +7,11 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 from services.firestore_service import FirestoreService
+from services.gmail_service import GmailService
+from services.pubsub_handler import PubSubHandler
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +23,8 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
 
 # Initialize services
 db = FirestoreService()
+gmail_service = GmailService(db.db)
+pubsub_handler = PubSubHandler(gmail_service, db)
 
 # ============================================================================
 # HEALTH CHECK
@@ -493,6 +497,140 @@ def create_snapshot():
         return jsonify({"success": True, "id": snapshot_id}), 201
     except Exception as e:
         print(f"❌ [API] Error creating snapshot: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# GMAIL INTEGRATION
+# ============================================================================
+
+
+@app.route("/api/gmail/auth/status", methods=["GET"])
+def gmail_auth_status():
+    """Check if Gmail is authenticated"""
+    try:
+        is_authenticated = gmail_service.is_authenticated()
+        return jsonify({"authenticated": is_authenticated}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gmail/auth/start", methods=["GET"])
+def gmail_auth_start():
+    """Start Gmail OAuth flow"""
+    try:
+        auth_url = gmail_service.get_authorization_url()
+        return jsonify({"auth_url": auth_url}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gmail/oauth/callback", methods=["GET"])
+def gmail_oauth_callback():
+    """Handle Gmail OAuth callback"""
+    code = request.args.get("code")
+    if not code:
+        return redirect("budgetinsight://gmail-error?message=No+authorization+code")
+
+    try:
+        # Exchange code for token
+        token_data = gmail_service.exchange_code_for_token(code)
+        print(f"✅ [Gmail] OAuth successful, tokens stored")
+
+        # Try to set up push notifications (non-blocking)
+        try:
+            watch_response = gmail_service.setup_push_notifications()
+            print(f"✅ [Gmail] Watch set up: {watch_response}")
+        except Exception as watch_error:
+            # Log error but don't fail the OAuth flow
+            print(f"⚠️ [Gmail] Watch setup failed (non-critical): {watch_error}")
+            # User can still manually set up watch later
+
+        # Always redirect back to app on success
+        return redirect("budgetinsight://gmail-connected")
+
+    except Exception as e:
+        print(f"❌ [Gmail] OAuth callback error: {e}")
+        error_message = str(e).replace(" ", "+")
+        return redirect(f"budgetinsight://gmail-error?message={error_message}")
+
+
+@app.route("/api/gmail/pubsub/webhook", methods=["POST"])
+def gmail_pubsub_webhook():
+    """
+    Receive Gmail push notifications from Pub/Sub
+    This endpoint is called by Google Cloud Pub/Sub
+    """
+    try:
+        pubsub_message = request.get_json()
+
+        if not pubsub_message:
+            return jsonify({"error": "No message received"}), 400
+
+        # Process the notification
+        result = pubsub_handler.process_notification(pubsub_message)
+
+        print(f"📬 [Pub/Sub] Processed notification: {result}")
+
+        # Always return 200 to acknowledge receipt
+        return jsonify({"success": True, "result": result}), 200
+
+    except Exception as e:
+        print(f"❌ [Pub/Sub] Webhook error: {e}")
+        # Still return 200 to avoid retries
+        return jsonify({"error": str(e)}), 200
+
+
+# ============================================================================
+# TRANSACTION ALERTS
+# ============================================================================
+
+
+@app.route("/api/transaction-alerts", methods=["GET"])
+def get_transaction_alerts():
+    """Get transaction alerts (query param: ?is_resolved=true/false)"""
+    try:
+        is_resolved_str = request.args.get("is_resolved")
+        is_resolved = None
+        if is_resolved_str is not None:
+            is_resolved = is_resolved_str.lower() == "true"
+
+        alerts = db.get_transaction_alerts(is_resolved=is_resolved)
+        return jsonify({"alerts": alerts}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/transaction-alerts/<alert_id>", methods=["GET"])
+def get_transaction_alert(alert_id):
+    """Get a specific transaction alert"""
+    try:
+        alert = db.get_transaction_alert(alert_id)
+        if not alert:
+            return jsonify({"error": "Alert not found"}), 404
+        return jsonify(alert), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/transaction-alerts/<alert_id>", methods=["PUT"])
+def update_transaction_alert(alert_id):
+    """Update a transaction alert (e.g., mark as resolved)"""
+    try:
+        updates = request.get_json()
+        db.update_transaction_alert(alert_id, updates)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/transaction-alerts/<alert_id>", methods=["DELETE"])
+def delete_transaction_alert(alert_id):
+    """Delete a transaction alert"""
+    try:
+        db.delete_transaction_alert(alert_id)
+        return jsonify({"success": True}), 200
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 

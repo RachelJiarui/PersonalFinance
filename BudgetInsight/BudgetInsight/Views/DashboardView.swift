@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var showManualEntry = false
+    @State private var showTransactionAlerts = false
     @State private var dashboardTask: Task<Void, Never>?
 
     var body: some View {
@@ -58,6 +59,23 @@ struct DashboardView: View {
                         }
                     }) {
                         Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+
+                    Divider()
+
+                    // Gmail Integration Section
+                    Button(action: {
+                        Task {
+                            await viewModel.connectGmail()
+                        }
+                    }) {
+                        Label("Connect Gmail", systemImage: "envelope.badge")
+                    }
+
+                    Button(action: {
+                        showTransactionAlerts = true
+                    }) {
+                        Label("Transaction Alerts", systemImage: "bell.badge")
                     }
 
                     Divider()
@@ -131,6 +149,9 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showManualEntry) {
             ManualEntryView()
+        }
+        .sheet(isPresented: $showTransactionAlerts) {
+            TransactionAlertsView()
         }
     }
 }

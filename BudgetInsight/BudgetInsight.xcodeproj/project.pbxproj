@@ -38,6 +38,8 @@
 		CC5437EF2F08CF430083C0D9 /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
 		CC5437F02F08CF430083C0D9 /* BudgetPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192372EFFNEW1 /* BudgetPlan.swift */; };
 		CC762D2D2F0383EE00DB650A /* EditTransactionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */; };
+		CC8CF4B72F0AE60600F1B28F /* TransactionAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC8CF4B62F0AE60600F1B28F /* TransactionAlert.swift */; };
+		CC8CF4B92F0AE61C00F1B28F /* TransactionAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC8CF4B82F0AE61C00F1B28F /* TransactionAlertsView.swift */; };
 		CCA4CD4E2F08E2F40066034F /* SharedUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */; };
 		CCF1921A2EFF46B90053873B /* PeriodSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192182EFF46B90053873B /* PeriodSnapshot.swift */; };
 		CCF1921D2EFF46B90053873B /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF192172EFF46B90053873B /* BudgetCategory.swift */; };
@@ -120,6 +122,8 @@
 		CC5437B72F08CC430083C0D9 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CC5437E92F08CDA80083C0D9 /* SharedUserDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUserDefaults.swift; sourceTree = "<group>"; };
 		CC762D2C2F0383EE00DB650A /* EditTransactionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTransactionView.swift; sourceTree = "<group>"; };
+		CC8CF4B62F0AE60600F1B28F /* TransactionAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAlert.swift; sourceTree = "<group>"; };
+		CC8CF4B82F0AE61C00F1B28F /* TransactionAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAlertsView.swift; sourceTree = "<group>"; };
 		CCA4CD4F2F08E3DB0066034F /* BudgetInsightWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BudgetInsightWidgetExtension.entitlements; sourceTree = "<group>"; };
 		CCA4CD502F08E4060066034F /* BudgetInsight.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BudgetInsight.entitlements; sourceTree = "<group>"; };
 		CCA794EE2F08EBD000106919 /* BudgetInsightWidgetExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "BudgetInsightWidgetExtension-Info.plist"; sourceTree = "<group>"; };
@@ -204,6 +208,7 @@
 		1A00001D /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				CC8CF4B62F0AE60600F1B28F /* TransactionAlert.swift */,
 				CCF2FC4C2F0641E700DC07DC /* CategoryBalance.swift */,
 				1A00000C /* Transaction.swift */,
 				CCF192172EFF46B90053873B /* BudgetCategory.swift */,
@@ -222,6 +227,7 @@
 		1A00001E /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				CC8CF4B82F0AE61C00F1B28F /* TransactionAlertsView.swift */,
 				CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */,
 				CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */,
 				CCF2FC3F2F06414C00DC07DC /* BackendRegistrationView.swift */,
@@ -462,7 +468,9 @@
 				CC5437AE2F08A7450083C0D9 /* CategoryTransactionsView.swift in Sources */,
 				1A000038 /* KeychainService.swift in Sources */,
 				1A000039 /* BudgetService.swift in Sources */,
+				CC8CF4B92F0AE61C00F1B28F /* TransactionAlertsView.swift in Sources */,
 				1A00003A /* CategoryCard.swift in Sources */,
+				CC8CF4B72F0AE60600F1B28F /* TransactionAlert.swift in Sources */,
 				1A00003E /* TransactionStorageService.swift in Sources */,
 				1A000040 /* ManualEntryView.swift in Sources */,
 				CCF192352EFF47060053873B /* BackendService.swift in Sources */,

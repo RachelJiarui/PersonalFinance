@@ -64,20 +64,10 @@ class SnapshotService: ObservableObject {
         }
 
         // Save to Firebase
-        print(
-            "📤 [SnapshotService] Attempting to save monthly snapshot to Firebase for \(month)/\(year)"
-        )
-        print(
-            "   Data: year=\(year), month=\(month), takeHome=\(snapshot.monthlyTakeHome), spending=\(snapshot.totalSpending), planId=\(snapshot.budgetPlanId)"
-        )
         do {
             let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
-            print(
-                "✅ [SnapshotService] Saved monthly snapshot for \(month)/\(year) to Firebase (ID: \(firebaseId))"
-            )
         } catch {
-            print("❌ [SnapshotService] Failed to save monthly snapshot to Firebase: \(error)")
-            print("   Error details: \(error.localizedDescription)")
+            print("❌ [SnapshotService] Failed to save monthly snapshot: \(error)")
             // Continue anyway - local storage succeeded
         }
     }
@@ -129,11 +119,8 @@ class SnapshotService: ObservableObject {
         // Save to Firebase
         do {
             let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
-            print(
-                "✅ [SnapshotService] Saved yearly snapshot for \(year) to Firebase (ID: \(firebaseId))"
-            )
         } catch {
-            print("❌ [SnapshotService] Failed to save yearly snapshot to Firebase: \(error)")
+            print("❌ [SnapshotService] Failed to save yearly snapshot: \(error)")
             // Continue anyway - local storage succeeded
         }
     }
@@ -151,7 +138,6 @@ class SnapshotService: ObservableObject {
 
         // Get the current active budget plan ID
         guard let currentPlan = BudgetService.shared.budgetPlan else {
-            print("⚠️ [SnapshotService] No active budget plan found, cannot create snapshots")
             return
         }
 

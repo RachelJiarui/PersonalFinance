@@ -353,10 +353,6 @@ struct EditTransactionView: View {
                 }
 
                 await MainActor.run {
-                    print(
-                        "✅ [EditTransaction] Updated transaction in Firestore: \(title) - $\(amountValue) (ID: \(originalTransaction.id))"
-                    )
-
                     isSaving = false
                     dismiss()
                 }

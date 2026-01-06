@@ -26,8 +26,6 @@ class FundService: ObservableObject {
         let hasDefaultFund = funds.contains { $0.isDefault && $0.name == "General Savings" }
 
         if !hasDefaultFund {
-            print("🔄 [FundService] Creating default General Savings fund...")
-
             let defaultFund = Fund(
                 id: "",
                 name: "General Savings",
@@ -44,7 +42,6 @@ class FundService: ObservableObject {
             // Save to Firestore
             do {
                 let firestoreId = try await BackendService.shared.createFund(defaultFund)
-                print("✅ [FundService] Created default fund in Firestore with ID: \(firestoreId)")
 
                 await MainActor.run {
                     let fundWithId = Fund(
@@ -68,8 +65,6 @@ class FundService: ObservableObject {
             } catch {
                 print("❌ [FundService] Error creating default fund: \(error)")
             }
-        } else {
-            print("✅ [FundService] Default General Savings fund already exists")
         }
     }
 
@@ -80,31 +75,16 @@ class FundService: ObservableObject {
     // MARK: - Firestore Data Fetching
 
     func fetchDataFromFirestore() async {
-        print("🔄 [FundService] Fetching funds from Firestore...")
-
         do {
             let firestoreFunds = try await BackendService.shared.fetchFunds()
-            print("✅ [FundService] Fetched \(firestoreFunds.count) funds from Firestore")
-
-            // Debug: Print details of fetched funds
-            for fund in firestoreFunds {
-                print(
-                    "   - Fund: \(fund.name), ID: \(fund.id), Active: \(fund.isActive), Balance: \(fund.balance)"
-                )
-            }
 
             await MainActor.run {
                 // Replace with Firestore data as source of truth
                 self.funds = firestoreFunds
                 self.saveFunds()
-
-                print("📊 [FundService] Total funds: \(self.funds.count)")
-                print("📊 [FundService] Active funds: \(self.getActiveFunds().count)")
             }
         } catch {
-            print("❌ [FundService] Error fetching funds from Firestore: \(error)")
-            print(
-                "⚠️ [FundService] Using local data only. Make sure backend is deployed and running.")
+            print("❌ [FundService] Error fetching funds: \(error)")
             // Continue using local data - don't clear the array
         }
     }
@@ -135,7 +115,6 @@ class FundService: ObservableObject {
         Task {
             do {
                 let firestoreId = try await BackendService.shared.createFund(newFund)
-                print("✅ [FundService] Created Fund in Firestore with ID: \(firestoreId)")
 
                 await MainActor.run {
                     // Create fund with actual Firestore ID
@@ -205,9 +184,8 @@ class FundService: ObservableObject {
                 Task {
                     do {
                         try await BackendService.shared.updateFund(fundId: fundId, updates: updates)
-                        print("✅ [FundService] Updated Fund in Firestore")
                     } catch {
-                        print("❌ [FundService] Error updating Fund in Firestore: \(error)")
+                        print("❌ [FundService] Error updating fund: \(error)")
                     }
                 }
             }
@@ -236,9 +214,8 @@ class FundService: ObservableObject {
                         fundId: fundId,
                         updates: ["balance": newBalance]
                     )
-                    print("✅ [FundService] Updated Fund balance in Firestore")
                 } catch {
-                    print("❌ [FundService] Error updating Fund balance in Firestore: \(error)")
+                    print("❌ [FundService] Error updating fund balance: \(error)")
                 }
             }
         }
@@ -262,9 +239,8 @@ class FundService: ObservableObject {
             Task {
                 do {
                     try await BackendService.shared.deleteFund(fundId)
-                    print("✅ [FundService] Marked Fund as inactive in Firestore")
                 } catch {
-                    print("❌ [FundService] Error deleting Fund: \(error)")
+                    print("❌ [FundService] Error deleting fund: \(error)")
                 }
             }
         }

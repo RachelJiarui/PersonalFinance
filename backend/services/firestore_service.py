@@ -22,9 +22,6 @@ class FirestoreService:
         # This will use Application Default Credentials (ADC) which works both locally and on Cloud Run
         self.db = firestore.Client(project=project_id)
         self.user_email = "rachel.j.chen@gmail.com"
-        print(
-            f"✅ Connected to Firestore (single-user mode: {self.user_email}, project: {project_id})"
-        )
 
     # ========================================================================
     # BUDGET CATEGORIES
@@ -266,12 +263,10 @@ class FirestoreService:
         try:
             created_at_str = plan_data.get("created_at")
             if not created_at_str:
-                print("❌ [Validation] created_at is required")
                 return False
 
             created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-        except Exception as e:
-            print(f"❌ [Validation] Invalid created_at format: {e}")
+        except Exception:
             return False
 
         end_date = None
@@ -280,24 +275,17 @@ class FirestoreService:
                 end_date = datetime.fromisoformat(
                     plan_data["end_date"].replace("Z", "+00:00")
                 )
-            except Exception as e:
-                print(f"❌ [Validation] Invalid end_date format: {e}")
+            except Exception:
                 return False
 
         # Invariant 2 & 4: Date validation
         if end_date:
             # Invariant 2: Must cover at least one month
             if self._same_month_year(created_at, end_date):
-                print(
-                    f"❌ [Validation] Invariant 2 failed: created_at and end_date cannot be same month/year"
-                )
                 return False
 
             # Invariant 4: Chronological order
             if created_at >= end_date:
-                print(
-                    f"❌ [Validation] Invariant 4 failed: created_at must be before end_date"
-                )
                 return False
 
         # Invariant 1: Only one active plan
@@ -307,9 +295,6 @@ class FirestoreService:
             for active_plan in active_plans:
                 if plan_id and active_plan["id"] == plan_id:
                     continue  # Skip self
-                print(
-                    f"❌ [Validation] Invariant 1 failed: Another active plan already exists (ID: {active_plan['id']})"
-                )
                 return False
 
         # Invariant 3: No overlapping ranges
@@ -321,9 +306,6 @@ class FirestoreService:
 
             # Skip old schema plans that don't have created_at
             if "created_at" not in existing_plan:
-                print(
-                    f"⚠️ [Validation] Skipping old schema plan {existing_plan.get('id')} - missing created_at"
-                )
                 continue
 
             try:
@@ -339,17 +321,10 @@ class FirestoreService:
                 if self._ranges_overlap(
                     created_at, end_date, existing_start, existing_end
                 ):
-                    print(
-                        f"❌ [Validation] Invariant 3 failed: Range overlaps with plan {existing_plan['id']}"
-                    )
                     return False
-            except Exception as e:
-                print(
-                    f"⚠️ [Validation] Error checking overlap with plan {existing_plan.get('id')}: {e}"
-                )
+            except Exception:
                 continue
 
-        print("✅ [Validation] All invariants passed")
         return True
 
     def get_budget_plans(self, year: Optional[int] = None) -> List[Dict]:
@@ -816,3 +791,99 @@ class FirestoreService:
         # Firestore auto-generates ID
         _, doc_ref = self.db.collection("snapshots").add(snapshot_data)
         return doc_ref.id
+
+    # ========================================================================
+    # TRANSACTION ALERTS
+    # ========================================================================
+
+    def get_transaction_alerts(
+        self, is_resolved: Optional[bool] = None, limit: int = 100
+    ) -> List[Dict]:
+        """
+        Get transaction alerts
+
+        Args:
+            is_resolved: Filter by resolution status (None = all)
+            limit: Maximum number of alerts
+        """
+        query = self.db.collection("transaction_alerts")
+
+        if is_resolved is not None:
+            query = query.where("is_resolved", "==", is_resolved)
+
+        alerts = (
+            query.order_by("received_at", direction=firestore.Query.DESCENDING)
+            .limit(limit)
+            .stream()
+        )
+        return [{"id": alert.id, **alert.to_dict()} for alert in alerts]
+
+    def get_transaction_alert(self, alert_id: str) -> Optional[Dict]:
+        """Get a specific transaction alert"""
+        doc = self.db.collection("transaction_alerts").document(alert_id).get()
+        if doc.exists:
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def get_transaction_alert_by_email_id(self, email_id: str) -> Optional[Dict]:
+        """Get transaction alert by Gmail message ID (prevents duplicates)"""
+        query = (
+            self.db.collection("transaction_alerts")
+            .where("email_id", "==", email_id)
+            .limit(1)
+        )
+        results = list(query.stream())
+        if results:
+            doc = results[0]
+            return {"id": doc.id, **doc.to_dict()}
+        return None
+
+    def create_transaction_alert(self, alert_data: Dict) -> str:
+        """
+        Create a new transaction alert
+
+        Expected fields:
+        - email_id: str (Gmail message ID, unique)
+        - merchant: str
+        - transaction_date: str (ISO8601)
+        - amount: float
+        - raw_email_body: str
+        - card_last4: str | null (optional)
+        - received_at: str (ISO8601, defaults to now)
+        - is_resolved: bool (default False)
+        - resolved_transaction_id: str | null (optional)
+        """
+        # Check for duplicate email_id
+        existing = self.get_transaction_alert_by_email_id(alert_data.get("email_id"))
+        if existing:
+            print(
+                f"⚠️ [TransactionAlert] Duplicate email_id {alert_data.get('email_id')}, skipping"
+            )
+            return existing["id"]
+
+        alert_data["created_at"] = firestore.SERVER_TIMESTAMP
+        alert_data["updated_at"] = firestore.SERVER_TIMESTAMP
+
+        # Set defaults
+        if "received_at" not in alert_data:
+            alert_data["received_at"] = datetime.now().isoformat()
+
+        if "is_resolved" not in alert_data:
+            alert_data["is_resolved"] = False
+
+        # Remove id if present - let Firestore generate it
+        alert_data.pop("id", None)
+
+        # Firestore auto-generates ID
+        _, doc_ref = self.db.collection("transaction_alerts").add(alert_data)
+        print(f"✅ [TransactionAlert] Created alert with ID: {doc_ref.id}")
+        return doc_ref.id
+
+    def update_transaction_alert(self, alert_id: str, updates: Dict):
+        """Update a transaction alert"""
+        updates["updated_at"] = firestore.SERVER_TIMESTAMP
+        self.db.collection("transaction_alerts").document(alert_id).update(updates)
+
+    def delete_transaction_alert(self, alert_id: str):
+        """Delete a transaction alert"""
+        self.db.collection("transaction_alerts").document(alert_id).delete()

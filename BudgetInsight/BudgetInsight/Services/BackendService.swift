@@ -1047,6 +1047,103 @@ class BackendService: ObservableObject {
 
         return id
     }
+
+    // MARK: - Gmail Integration
+
+    func startGmailAuth() async throws -> GmailAuthResponse {
+        let url = URL(string: "\(baseURL)/gmail/auth/start")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(GmailAuthResponse.self, from: data)
+    }
+
+    func fetchTransactionAlerts() async throws -> [TransactionAlert] {
+        let url = URL(string: "\(baseURL)/transaction-alerts")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // Try multiple ISO8601 formats
+            let formatters: [ISO8601DateFormatter] = [
+                // With fractional seconds and timezone
+                {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    return formatter
+                }(),
+                // Standard ISO8601 with timezone
+                ISO8601DateFormatter(),
+                // Without timezone (e.g., "2026-01-05T00:00:00")
+                {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [
+                        .withFullDate, .withTime, .withColonSeparatorInTime,
+                        .withDashSeparatorInDate,
+                    ]
+                    return formatter
+                }(),
+            ]
+
+            for formatter in formatters {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+            }
+
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Invalid date format: \(dateString)"
+                )
+            )
+        }
+
+        let result = try decoder.decode(TransactionAlertsResponse.self, from: data)
+        return result.alerts
+    }
+
+    func deleteTransactionAlert(alertId: String) async throws {
+        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+    }
+}
+
+// MARK: - Response Models
+
+struct GmailAuthResponse: Codable {
+    let authUrl: String
+
+    enum CodingKeys: String, CodingKey {
+        case authUrl = "auth_url"
+    }
+}
+
+struct TransactionAlertsResponse: Codable {
+    let alerts: [TransactionAlert]
 }
 
 // MARK: - Errors

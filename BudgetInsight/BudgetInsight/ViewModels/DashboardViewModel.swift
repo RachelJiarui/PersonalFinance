@@ -1,8 +1,10 @@
+import AuthenticationServices
 import Combine
 import Foundation
+import UIKit
 
 @MainActor
-class DashboardViewModel: ObservableObject {
+class DashboardViewModel: NSObject, ObservableObject {
     @Published var budgetCategories: [BudgetCategory] = []
     @Published var budgetPlan: BudgetPlan?
     @Published var categorySpending: [String: Double] = [:]
@@ -16,7 +18,8 @@ class DashboardViewModel: ObservableObject {
     private let backendService = BackendService.shared
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    override init() {
+        super.init()
         setupSubscriptions()
         loadLocalData()
     }
@@ -199,6 +202,44 @@ class DashboardViewModel: ObservableObject {
         // Disconnect method kept for compatibility
     }
 
+    func connectGmail() async {
+        print("📧 [DashboardViewModel] Starting Gmail OAuth flow")
+
+        do {
+            // Get auth URL from backend using BackendService
+            let result = try await backendService.startGmailAuth()
+
+            guard let authURL = URL(string: result.authUrl) else {
+                print("❌ Invalid auth URL")
+                return
+            }
+
+            // Use ASWebAuthenticationSession for in-app OAuth
+            let callbackScheme = "budgetinsight"
+
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let session = ASWebAuthenticationSession(
+                    url: authURL,
+                    callbackURLScheme: callbackScheme
+                ) { callbackURL, error in
+                    if let error = error {
+                        print("❌ OAuth session error: \(error)")
+                    } else if let callbackURL = callbackURL {
+                        print("✅ OAuth callback received: \(callbackURL)")
+                    }
+                    continuation.resume()
+                }
+
+                session.presentationContextProvider = self
+                session.prefersEphemeralWebBrowserSession = false
+                session.start()
+            }
+
+        } catch {
+            print("❌ Error connecting Gmail: \(error)")
+        }
+    }
+
     func cancelAllTasks() {
         print("🛑 [DashboardViewModel] Cancelling all active tasks")
         // Tasks are managed by the views that call the async methods
@@ -247,5 +288,21 @@ class DashboardViewModel: ObservableObject {
 
     func getCategorySpendingRatio(for categoryId: String) -> Double {
         return budgetService.getCategorySpendingRatio(categoryId: categoryId) ?? 0.0
+    }
+}
+
+// MARK: - ASWebAuthenticationPresentationContextProviding
+
+extension DashboardViewModel: ASWebAuthenticationPresentationContextProviding {
+    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession)
+        -> ASPresentationAnchor
+    {
+        // Must use MainActor to access UIApplication
+        return MainActor.assumeIsolated {
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+        }
     }
 }
