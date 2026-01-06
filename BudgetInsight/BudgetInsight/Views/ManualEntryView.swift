@@ -15,12 +15,16 @@ struct ManualEntryView: View {
     @StateObject private var debtService = DebtService.shared
     @StateObject private var allocationService = AllocationService.shared
     @StateObject private var backendService = BackendService.shared
+    @StateObject private var alertService = TransactionAlertService.shared
 
     // Form fields matching Transaction model
     @State private var amount: String = ""
     @State private var title: String = ""
     @State private var date: Date = Date()
     @State private var isExpense: Bool = true
+
+    // Transaction Alert linking
+    @State private var selectedAlertId: String? = nil
 
     // Allocation management
     @State private var allocations: [AllocationItem] = []
@@ -80,6 +84,41 @@ struct ManualEntryView: View {
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: isExpense ? .red : .green))
+                }
+
+                // MARK: - Transaction Alert Linking
+                Section(header: Text("Link to Transaction Alert (Optional)")) {
+                    Picker("Transaction Alert", selection: $selectedAlertId) {
+                        Text("None").tag(nil as String?)
+
+                        ForEach(alertService.unresolvedAlerts) { alert in
+                            VStack(alignment: .leading) {
+                                Text("\(alert.merchant) - $\(alert.amount, specifier: "%.2f")")
+                                Text(alert.transactionDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(alert.id as String?)
+                        }
+                    }
+                    .onChange(of: selectedAlertId) { newAlertId in
+                        if let alertId = newAlertId,
+                            let alert = alertService.unresolvedAlerts.first(where: {
+                                $0.id == alertId
+                            })
+                        {
+                            // Pre-fill form with alert data
+                            amount = String(format: "%.2f", alert.amount)
+                            title = alert.merchant
+                            date = alert.transactionDate
+                        }
+                    }
+
+                    if selectedAlertId != nil {
+                        Text("This transaction will mark the alert as resolved")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
                 }
 
                 // MARK: - Allocations
@@ -206,6 +245,11 @@ struct ManualEntryView: View {
     // MARK: - Methods
 
     private func loadData() {
+        // Load transaction alerts
+        Task {
+            await alertService.fetchAlerts()
+        }
+
         // Create default allocation if amount is set
         if !amount.isEmpty, let amountValue = Double(amount), allocations.isEmpty {
             // Default to first active category if available
@@ -250,7 +294,8 @@ struct ManualEntryView: View {
             date: date,
             title: title,
             isExpense: isExpense,
-            timestamp: Date()
+            timestamp: Date(),
+            transactionAlertId: selectedAlertId
         )
 
         // Save to backend first
@@ -276,17 +321,18 @@ struct ManualEntryView: View {
                     )
                 }
 
+                // Link to transaction alert if selected
+                if let alertId = selectedAlertId {
+                    try await alertService.linkTransactionToAlert(
+                        transactionId: firestoreId,
+                        alertId: alertId
+                    )
+                    print("✅ [ManualEntry] Linked transaction to alert: \(alertId)")
+                }
+
                 // Update category spending (instant UI update)
                 await MainActor.run {
                     budgetService.updateCategorySpending(with: storageService.transactions)
-                }
-
-                // Update snapshots
-                if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
-                    await SnapshotService.shared.updateSnapshotsIfNeeded(
-                        monthlyTakeHome: monthlyTakeHome,
-                        transactions: storageService.transactions
-                    )
                 }
 
                 print(

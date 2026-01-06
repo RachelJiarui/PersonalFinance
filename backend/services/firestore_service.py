@@ -161,7 +161,7 @@ class FirestoreService:
         - category_id: str (BudgetCategory UUID)
         - is_expense: bool
         - timestamp: str (ISO8601, defaults to now)
-        - linked_email_alert_id: str | null (optional)
+        - transaction_alert_id: str | null (optional, links to TransactionAlert)
         """
         transaction_data["created_at"] = firestore.SERVER_TIMESTAMP
         transaction_data["updated_at"] = firestore.SERVER_TIMESTAMP
@@ -851,7 +851,7 @@ class FirestoreService:
         - card_last4: str | null (optional)
         - received_at: str (ISO8601, defaults to now)
         - is_resolved: bool (default False)
-        - resolved_transaction_id: str | null (optional)
+        - linked_transaction_id: str | null (optional, links to Transaction)
         """
         # Check for duplicate email_id
         existing = self.get_transaction_alert_by_email_id(alert_data.get("email_id"))

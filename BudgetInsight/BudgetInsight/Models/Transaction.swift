@@ -15,9 +15,22 @@ struct Transaction: Identifiable, Codable {
     // Automatic
     let timestamp: Date  // Auto-set to now() when creating transaction
 
+    // Optional link to TransactionAlert
+    var transactionAlertId: String?  // Links to TransactionAlert that this resolves
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case amount
+        case date
+        case title
+        case isExpense = "is_expense"
+        case timestamp
+        case transactionAlertId = "transaction_alert_id"
+    }
+
     init(
         id: String = "", amount: Double, date: Date, title: String,
-        isExpense: Bool, timestamp: Date = Date()
+        isExpense: Bool, timestamp: Date = Date(), transactionAlertId: String? = nil
     ) {
         self.id = id
         self.amount = amount
@@ -25,5 +38,6 @@ struct Transaction: Identifiable, Codable {
         self.title = title
         self.isExpense = isExpense
         self.timestamp = timestamp
+        self.transactionAlertId = transactionAlertId
     }
 }

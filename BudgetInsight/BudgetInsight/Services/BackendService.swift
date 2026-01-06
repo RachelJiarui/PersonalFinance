@@ -68,13 +68,17 @@ class BackendService: ObservableObject {
                 let timestampString = dict["timestamp"] as? String,
                 let timestamp = dateFormatter.date(from: timestampString)
             {
+                // Optional transaction_alert_id field
+                let transactionAlertId = dict["transaction_alert_id"] as? String
+
                 let transaction = Transaction(
                     id: id,
                     amount: amount,
                     date: date,
                     title: title,
                     isExpense: isExpense,
-                    timestamp: timestamp
+                    timestamp: timestamp,
+                    transactionAlertId: transactionAlertId
                 )
                 transactions.append(transaction)
             }
@@ -90,13 +94,18 @@ class BackendService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "amount": transaction.amount,
             "title": transaction.title,
             "is_expense": transaction.isExpense,
             "date": dateFormatter.string(from: transaction.date),
             "timestamp": dateFormatter.string(from: transaction.timestamp),
         ]
+
+        // Add transaction_alert_id if present
+        if let alertId = transaction.transactionAlertId {
+            body["transaction_alert_id"] = alertId
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -1115,6 +1124,22 @@ class BackendService: ObservableObject {
 
         let result = try decoder.decode(TransactionAlertsResponse.self, from: data)
         return result.alerts
+    }
+
+    func updateTransactionAlert(alertId: String, updates: [String: Any]) async throws {
+        let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: updates)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
     }
 
     func deleteTransactionAlert(alertId: String) async throws {

@@ -125,40 +125,6 @@ class SnapshotService: ObservableObject {
         }
     }
 
-    // MARK: - Automatic Snapshot Updates
-
-    func updateSnapshotsIfNeeded(
-        monthlyTakeHome: Double,
-        transactions: [Transaction]
-    ) async {
-        let calendar = Calendar.current
-        let now = Date()
-        let currentYear = calendar.component(.year, from: now)
-        let currentMonth = calendar.component(.month, from: now)
-
-        // Get the current active budget plan ID
-        guard let currentPlan = BudgetService.shared.budgetPlan else {
-            return
-        }
-
-        // Create/update snapshot for current month
-        await createMonthlySnapshot(
-            year: currentYear,
-            month: currentMonth,
-            monthlyTakeHome: monthlyTakeHome,
-            transactions: transactions,
-            budgetPlanId: currentPlan.id
-        )
-
-        // Create/update snapshot for current year
-        await createYearlySnapshot(
-            year: currentYear,
-            monthlyTakeHome: monthlyTakeHome,
-            transactions: transactions,
-            budgetPlanId: currentPlan.id
-        )
-    }
-
     // MARK: - Manual Snapshot Management
 
     func addSnapshot(_ snapshot: PeriodSnapshot) {

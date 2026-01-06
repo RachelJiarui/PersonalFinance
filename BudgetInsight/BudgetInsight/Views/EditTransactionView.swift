@@ -8,6 +8,7 @@ struct EditTransactionView: View {
     @StateObject private var debtService = DebtService.shared
     @StateObject private var allocationService = AllocationService.shared
     @StateObject private var backendService = BackendService.shared
+    @StateObject private var alertService = TransactionAlertService.shared
 
     let originalTransaction: Transaction
     let originalAllocations: [TransactionAllocation]
@@ -17,6 +18,9 @@ struct EditTransactionView: View {
     @State private var title: String = ""
     @State private var date: Date = Date()
     @State private var isExpense: Bool = true
+
+    // Transaction Alert linking
+    @State private var selectedAlertId: String? = nil
 
     // Allocation management
     @State private var allocations: [AllocationItem] = []
@@ -76,6 +80,56 @@ struct EditTransactionView: View {
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: isExpense ? .red : .green))
+                }
+
+                // MARK: - Transaction Alert Linking
+                Section(header: Text("Link to Transaction Alert (Optional)")) {
+                    Picker("Transaction Alert", selection: $selectedAlertId) {
+                        Text("None").tag(nil as String?)
+
+                        ForEach(alertService.unresolvedAlerts) { alert in
+                            VStack(alignment: .leading) {
+                                Text("\(alert.merchant) - $\(alert.amount, specifier: "%.2f")")
+                                Text(alert.transactionDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(alert.id as String?)
+                        }
+
+                        // Show currently linked alert even if resolved
+                        if let currentAlertId = selectedAlertId,
+                            let currentAlert = alertService.alerts.first(where: {
+                                $0.id == currentAlertId
+                            }),
+                            currentAlert.isResolved
+                        {
+                            VStack(alignment: .leading) {
+                                Text(
+                                    "\(currentAlert.merchant) - $\(currentAlert.amount, specifier: "%.2f")"
+                                )
+                                Text(currentAlert.transactionDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("(Currently Linked)")
+                                    .font(.caption2)
+                                    .foregroundColor(.green)
+                            }
+                            .tag(currentAlert.id as String?)
+                        }
+                    }
+
+                    if selectedAlertId != nil {
+                        if selectedAlertId != originalTransaction.transactionAlertId {
+                            Text("Changing the linked alert will update resolution status")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        } else {
+                            Text("This transaction resolves this alert")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                    }
                 }
 
                 // MARK: - Allocations
@@ -202,11 +256,17 @@ struct EditTransactionView: View {
     // MARK: - Methods
 
     private func loadData() {
+        // Load transaction alerts
+        Task {
+            await alertService.fetchAlerts()
+        }
+
         // Pre-fill form with current transaction data
         amount = String(format: "%.2f", originalTransaction.amount)
         title = originalTransaction.title
         date = originalTransaction.date
         isExpense = originalTransaction.isExpense
+        selectedAlertId = originalTransaction.transactionAlertId
 
         // Convert existing allocations to AllocationItems
         allocations = originalAllocations.map { allocation in
@@ -310,20 +370,42 @@ struct EditTransactionView: View {
                     }
                 }
 
-                // Step 3: Update the transaction itself
+                // Step 3: Handle transaction alert linking changes
+                let oldAlertId = originalTransaction.transactionAlertId
+                let newAlertId = selectedAlertId
+
+                if oldAlertId != newAlertId {
+                    try await alertService.relinkTransaction(
+                        transactionId: originalTransaction.id,
+                        oldAlertId: oldAlertId,
+                        newAlertId: newAlertId
+                    )
+                    print(
+                        "✅ [EditTransaction] Updated alert link: \(String(describing: oldAlertId)) -> \(String(describing: newAlertId))"
+                    )
+                }
+
+                // Step 4: Update the transaction itself
                 let dateFormatter = ISO8601DateFormatter()
-                let updates: [String: Any] = [
+                var updates: [String: Any] = [
                     "amount": amountValue,
                     "title": title,
                     "is_expense": isExpense,
                     "date": dateFormatter.string(from: date),
                 ]
 
+                // Add transaction_alert_id to updates (can be null)
+                if let alertId = selectedAlertId {
+                    updates["transaction_alert_id"] = alertId
+                } else {
+                    updates["transaction_alert_id"] = NSNull()
+                }
+
                 // Update in Firestore
                 try await backendService.updateTransaction(
                     transactionId: originalTransaction.id, updates: updates)
 
-                // Step 4: Update local storage
+                // Step 5: Update local storage
                 await MainActor.run {
                     if let index = storageService.transactions.firstIndex(where: {
                         $0.id == originalTransaction.id
@@ -334,7 +416,8 @@ struct EditTransactionView: View {
                             date: date,
                             title: title,
                             isExpense: isExpense,
-                            timestamp: originalTransaction.timestamp
+                            timestamp: originalTransaction.timestamp,
+                            transactionAlertId: selectedAlertId
                         )
                         storageService.transactions[index] = updatedTransaction
                         storageService.persistTransactions()
@@ -342,14 +425,6 @@ struct EditTransactionView: View {
 
                     // Update category spending (instant UI update)
                     budgetService.updateCategorySpending(with: storageService.transactions)
-                }
-
-                // Update snapshots
-                if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
-                    await SnapshotService.shared.updateSnapshotsIfNeeded(
-                        monthlyTakeHome: monthlyTakeHome,
-                        transactions: storageService.transactions
-                    )
                 }
 
                 await MainActor.run {

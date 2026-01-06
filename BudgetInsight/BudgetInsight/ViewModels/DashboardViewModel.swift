@@ -60,14 +60,6 @@ class DashboardViewModel: NSObject, ObservableObject {
             // Update category spending with current transactions
             budgetService.updateCategorySpending(with: storageService.transactions)
 
-            // Update snapshots for historical tracking
-            if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
-                await snapshotService.updateSnapshotsIfNeeded(
-                    monthlyTakeHome: monthlyTakeHome,
-                    transactions: storageService.transactions
-                )
-            }
-
             print(
                 "🔄 [DashboardViewModel] refreshData() complete - \(transactions.count) transactions\n"
             )
@@ -254,16 +246,6 @@ class DashboardViewModel: NSObject, ObservableObject {
 
         // Update category spending with current transactions (synchronous, instant)
         budgetService.updateCategorySpending(with: storageService.transactions)
-
-        // Update snapshots for historical tracking (async in background)
-        if let monthlyTakeHome = budgetService.budgetPlan?.monthlyTakeHome {
-            Task {
-                await snapshotService.updateSnapshotsIfNeeded(
-                    monthlyTakeHome: monthlyTakeHome,
-                    transactions: storageService.transactions
-                )
-            }
-        }
 
         print("✅ [DashboardViewModel] Synchronous update complete")
     }

@@ -21,7 +21,7 @@ struct TransactionAlert: Identifiable, Codable {
 
     // Resolution
     var isResolved: Bool  // Whether user has resolved this alert
-    var resolvedTransactionId: String?  // Link to created Transaction (if resolved)
+    var linkedTransactionId: String?  // Link to created Transaction (if resolved)
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -33,7 +33,7 @@ struct TransactionAlert: Identifiable, Codable {
         case cardLast4 = "card_last4"
         case receivedAt = "received_at"
         case isResolved = "is_resolved"
-        case resolvedTransactionId = "resolved_transaction_id"
+        case linkedTransactionId = "linked_transaction_id"
     }
 
     init(
@@ -46,7 +46,7 @@ struct TransactionAlert: Identifiable, Codable {
         cardLast4: String? = nil,
         receivedAt: Date = Date(),
         isResolved: Bool = false,
-        resolvedTransactionId: String? = nil
+        linkedTransactionId: String? = nil
     ) {
         self.id = id
         self.emailId = emailId
@@ -57,6 +57,6 @@ struct TransactionAlert: Identifiable, Codable {
         self.cardLast4 = cardLast4
         self.receivedAt = receivedAt
         self.isResolved = isResolved
-        self.resolvedTransactionId = resolvedTransactionId
+        self.linkedTransactionId = linkedTransactionId
     }
 }
