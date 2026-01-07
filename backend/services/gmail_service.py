@@ -205,32 +205,46 @@ class GmailService:
         return headers
 
     def get_message_body(self, message: Dict) -> str:
-        """Extract plain text body from Gmail message"""
+        """
+        Extract message body from Gmail message
+        Prioritizes HTML content for Discover emails since transaction details
+        are only present in the HTML version
+        """
         payload = message.get("payload", {})
 
-        # Try to get plain text part
-        def get_text_from_parts(parts):
+        # Try to get HTML and plain text parts
+        def get_body_from_parts(parts):
+            html_body = None
+            text_body = None
+
             for part in parts:
                 mime_type = part.get("mimeType", "")
 
-                if mime_type == "text/plain":
+                if mime_type == "text/html":
                     data = part.get("body", {}).get("data", "")
                     if data:
-                        return base64.urlsafe_b64decode(data).decode("utf-8")
+                        html_body = base64.urlsafe_b64decode(data).decode("utf-8")
+
+                elif mime_type == "text/plain":
+                    data = part.get("body", {}).get("data", "")
+                    if data:
+                        text_body = base64.urlsafe_b64decode(data).decode("utf-8")
 
                 # Recursively check nested parts
                 if "parts" in part:
-                    text = get_text_from_parts(part["parts"])
-                    if text:
-                        return text
+                    nested_html, nested_text = get_body_from_parts(part["parts"])
+                    if nested_html:
+                        html_body = nested_html
+                    if nested_text:
+                        text_body = nested_text
 
-            return None
+            return html_body, text_body
 
         # Check if message has parts
         if "parts" in payload:
-            text = get_text_from_parts(payload["parts"])
-            if text:
-                return text
+            html_body, text_body = get_body_from_parts(payload["parts"])
+            # Prefer HTML for Discover emails since transaction details are only there
+            return html_body or text_body or ""
 
         # If no parts, try direct body
         body_data = payload.get("body", {}).get("data", "")

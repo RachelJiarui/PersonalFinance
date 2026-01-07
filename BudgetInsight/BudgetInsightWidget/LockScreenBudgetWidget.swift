@@ -132,7 +132,7 @@ struct LockScreenCategoryCircle: View {
 
             // Percentage under circle (bigger)
             Text("\(Int(category.spendingRatio * 100))%")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
         }
     }
