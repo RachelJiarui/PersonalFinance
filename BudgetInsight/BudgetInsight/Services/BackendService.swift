@@ -1060,16 +1060,36 @@ class BackendService: ObservableObject {
     // MARK: - Gmail Integration
 
     func startGmailAuth() async throws -> GmailAuthResponse {
+        print("📧 [BackendService] Starting Gmail auth request...")
+        print("📧 [BackendService] Base URL: \(baseURL)")
+
         let url = URL(string: "\(baseURL)/gmail/auth/start")!
+        print("📧 [BackendService] Request URL: \(url.absoluteString)")
+
         let (data, response) = try await URLSession.shared.data(from: url)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ [BackendService] Invalid response type")
             throw BackendError.invalidResponse
         }
 
-        return try JSONDecoder().decode(GmailAuthResponse.self, from: data)
+        print("📧 [BackendService] Response status code: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 else {
+            print("❌ [BackendService] Non-200 status code: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ [BackendService] Response body: \(responseString)")
+            }
+            throw BackendError.invalidResponse
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📧 [BackendService] Response body: \(responseString)")
+        }
+
+        let decoded = try JSONDecoder().decode(GmailAuthResponse.self, from: data)
+        print("✅ [BackendService] Successfully decoded auth response")
+        return decoded
     }
 
     func fetchTransactionAlerts() async throws -> [TransactionAlert] {

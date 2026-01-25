@@ -20,7 +20,6 @@ class GmailService:
 
     SCOPES = [
         "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.metadata",
     ]
 
     def __init__(self, firestore_client: firestore.Client):
@@ -58,9 +57,7 @@ class GmailService:
     def get_authorization_url(self) -> str:
         """Generate OAuth authorization URL"""
         flow = self.get_oauth_flow()
-        auth_url, _ = flow.authorization_url(
-            access_type="offline", include_granted_scopes="true", prompt="consent"
-        )
+        auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
         return auth_url
 
     def exchange_code_for_token(self, code: str) -> Dict:

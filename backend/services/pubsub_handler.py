@@ -7,6 +7,8 @@ import base64
 import json
 from typing import Dict
 
+from google.cloud import firestore
+
 from services.email_parser import DiscoverEmailParser
 from services.firestore_service import FirestoreService
 from services.gmail_service import GmailService
@@ -103,12 +105,17 @@ class PubSubHandler:
 
             messages = results.get("messages", [])
 
+            print(f"📧 [PubSub] Direct fetch returned {len(messages)} messages")
+
             if not messages:
+                print(f"⚠️ [PubSub] No messages found in INBOX")
                 return {"status": "no_messages"}
 
             # Extract message IDs and use batch processing
             message_ids = [msg["id"] for msg in messages]
-            print(f"📧 [PubSub] Found {len(message_ids)} recent messages")
+            print(
+                f"📧 [PubSub] Found {len(message_ids)} recent messages: {message_ids}"
+            )
 
             return self._process_messages_batch(message_ids)
 
@@ -145,9 +152,18 @@ class PubSubHandler:
 
             changes = history_response.get("history", [])
             print(f"📧 [PubSub Handler] Found {len(changes)} history changes")
+            print(
+                f"📧 [PubSub Handler] History response keys: {list(history_response.keys())}"
+            )
+            print(
+                f"📧 [PubSub Handler] Current history ID in response: {history_response.get('historyId', 'N/A')}"
+            )
 
             if not changes:
-                return {"status": "no_changes"}
+                print(
+                    f"⚠️ [PubSub Handler] No history changes found, trying direct message fetch as fallback"
+                )
+                return self._process_new_messages()
 
             # Collect all new message IDs
             message_ids = []
@@ -333,7 +349,7 @@ class PubSubHandler:
             ).set(
                 {
                     "last_history_id": history_id,
-                    "updated_at": self.db.db.server_timestamp(),
+                    "updated_at": firestore.SERVER_TIMESTAMP,
                 },
                 merge=True,
             )

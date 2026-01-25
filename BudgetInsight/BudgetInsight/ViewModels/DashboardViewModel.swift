@@ -199,12 +199,16 @@ class DashboardViewModel: NSObject, ObservableObject {
 
         do {
             // Get auth URL from backend using BackendService
+            print("📧 [DashboardViewModel] Requesting auth URL from backend...")
             let result = try await backendService.startGmailAuth()
+            print("📧 [DashboardViewModel] Received auth URL: \(result.authUrl)")
 
             guard let authURL = URL(string: result.authUrl) else {
-                print("❌ Invalid auth URL")
+                print("❌ [DashboardViewModel] Invalid auth URL: \(result.authUrl)")
                 return
             }
+
+            print("📧 [DashboardViewModel] Opening OAuth browser session...")
 
             // Use ASWebAuthenticationSession for in-app OAuth
             let callbackScheme = "budgetinsight"
@@ -215,20 +219,43 @@ class DashboardViewModel: NSObject, ObservableObject {
                     callbackURLScheme: callbackScheme
                 ) { callbackURL, error in
                     if let error = error {
-                        print("❌ OAuth session error: \(error)")
+                        print(
+                            "❌ [DashboardViewModel] OAuth session error: \(error.localizedDescription)"
+                        )
+                        print("❌ [DashboardViewModel] Error details: \(error)")
                     } else if let callbackURL = callbackURL {
-                        print("✅ OAuth callback received: \(callbackURL)")
+                        print(
+                            "✅ [DashboardViewModel] OAuth callback received: \(callbackURL.absoluteString)"
+                        )
+
+                        // Parse callback URL to check for success/error
+                        if callbackURL.absoluteString.contains("gmail-connected") {
+                            print("✅ [DashboardViewModel] Gmail connected successfully!")
+                        } else if callbackURL.absoluteString.contains("gmail-error") {
+                            print("❌ [DashboardViewModel] Gmail connection failed")
+                        }
                     }
                     continuation.resume()
                 }
 
                 session.presentationContextProvider = self
                 session.prefersEphemeralWebBrowserSession = false
-                session.start()
+
+                print("📧 [DashboardViewModel] Starting ASWebAuthenticationSession...")
+                let started = session.start()
+                print("📧 [DashboardViewModel] Session start result: \(started)")
             }
 
+            print("📧 [DashboardViewModel] OAuth flow completed")
+
         } catch {
-            print("❌ Error connecting Gmail: \(error)")
+            print("❌ [DashboardViewModel] Error connecting Gmail: \(error.localizedDescription)")
+            print("❌ [DashboardViewModel] Error details: \(error)")
+
+            // Show error to user
+            await MainActor.run {
+                self.errorMessage = "Failed to connect Gmail: \(error.localizedDescription)"
+            }
         }
     }
 
