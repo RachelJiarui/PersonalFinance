@@ -31,7 +31,7 @@ struct DashboardCategoryCard: View {
             return .red  // Over budget
         } else if roundedRatio <= timeRatio {
             return .green  // On track (spending matches or below time progress)
-        } else if roundedRatio <= 1.5 * timeRatio {
+        } else if roundedRatio <= 1.15 * timeRatio {
             return .yellow  // 50% ahead but not over budget
         } else {
             return .red  // Way ahead of schedule
