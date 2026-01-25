@@ -56,7 +56,7 @@ struct CircularLockScreenWidget: View {
 
             // Percentage in center
             VStack(spacing: 0) {
-                Text("\(Int(entry.spendingRatio * 100))")
+                Text("\(Int(round(entry.spendingRatio * 100)))")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                 Text("%")
                     .font(.system(size: 10, weight: .medium))
@@ -131,7 +131,7 @@ struct LockScreenCategoryCircle: View {
             }
 
             // Percentage under circle (bigger)
-            Text("\(Int(category.spendingRatio * 100))%")
+            Text("\(Int(round(category.spendingRatio * 100)))%")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
         }

@@ -67,7 +67,7 @@ struct CategoryCircleWithLabel: View {
             }
 
             // Percentage under circle
-            Text("\(Int(category.spendingRatio * 100))%")
+            Text("\(Int(round(category.spendingRatio * 100)))%")
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
         }

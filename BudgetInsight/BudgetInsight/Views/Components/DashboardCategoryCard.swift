@@ -24,11 +24,14 @@ struct DashboardCategoryCard: View {
 
     // Calculate ring color based on spending vs time progress
     private var ringColor: Color {
-        if spendingRatio >= 1.0 {
+        // Round to match displayed percentage (e.g., 0.998 -> 1.0 for "100%")
+        let roundedRatio = round(spendingRatio * 100) / 100
+
+        if roundedRatio >= 1.0 {
             return .red  // Over budget
-        } else if spendingRatio <= timeRatio {
+        } else if roundedRatio <= timeRatio {
             return .green  // On track (spending matches or below time progress)
-        } else if spendingRatio <= 1.5 * timeRatio {
+        } else if roundedRatio <= 1.5 * timeRatio {
             return .yellow  // 50% ahead but not over budget
         } else {
             return .red  // Way ahead of schedule
@@ -70,7 +73,7 @@ struct DashboardCategoryCard: View {
                     .frame(width: 100, height: 100)
 
                     VStack(spacing: 2) {
-                        Text("\(Int(spendingRatio * 100))%")
+                        Text("\(Int(round(spendingRatio * 100)))%")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.primary)

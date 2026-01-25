@@ -115,12 +115,14 @@ struct WidgetDataProvider {
     /// Calculate ring color based on spending vs time progress (matches DashboardCategoryCard logic)
     static func calculateRingColor(spendingRatio: Double) -> WidgetColor {
         let timeRatio = calculateTimeRatio()
+        // Round to match displayed percentage (e.g., 0.998 -> 1.0 for "100%")
+        let roundedRatio = round(spendingRatio * 100) / 100
 
-        if spendingRatio >= 1.0 {
+        if roundedRatio >= 1.0 {
             return .red  // Over budget
-        } else if spendingRatio <= timeRatio {
+        } else if roundedRatio <= timeRatio {
             return .green  // On track
-        } else if spendingRatio <= 1.5 * timeRatio {
+        } else if roundedRatio <= 1.15 * timeRatio {
             return .yellow  // Slightly ahead
         } else {
             return .red  // Way ahead of schedule

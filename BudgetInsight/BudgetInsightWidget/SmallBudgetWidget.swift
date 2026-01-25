@@ -6,7 +6,7 @@ struct SmallBudgetWidget: View {
     let entry: BudgetWidgetEntry
 
     private var percentText: String {
-        "\(Int(entry.spendingRatio * 100))%"
+        "\(Int(round(entry.spendingRatio * 100)))%"
     }
 
     private var spentText: String {
