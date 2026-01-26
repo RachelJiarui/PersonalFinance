@@ -525,6 +525,41 @@ def gmail_auth_start():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/gmail/watch/status", methods=["GET"])
+def gmail_watch_status():
+    """Get current Gmail watch status"""
+    try:
+        is_active, expiration_ms, seconds_remaining = gmail_service.get_watch_status()
+
+        response = {
+            "is_active": is_active,
+            "expiration_ms": expiration_ms,
+            "seconds_remaining": seconds_remaining,
+            "hours_remaining": round(seconds_remaining / 3600, 1)
+            if seconds_remaining
+            else None,
+        }
+        return jsonify(response), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gmail/watch/renew", methods=["POST"])
+def gmail_watch_renew():
+    """Manually renew Gmail watch (force renewal regardless of expiration)"""
+    try:
+        response = gmail_service.setup_push_notifications()
+        return jsonify(
+            {
+                "success": True,
+                "history_id": response.get("historyId"),
+                "expiration": response.get("expiration"),
+            }
+        ), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/gmail/oauth/callback", methods=["GET"])
 def gmail_oauth_callback():
     """Handle Gmail OAuth callback"""
@@ -566,6 +601,15 @@ def gmail_pubsub_webhook():
 
         if not pubsub_message:
             return jsonify({"error": "No message received"}), 400
+
+        # Check and renew watch if needed (non-blocking)
+        try:
+            renewal_status = gmail_service.check_and_renew_watch(threshold_hours=24)
+            if renewal_status.get("renewed"):
+                print(f"🔄 [Gmail] Watch renewed: {renewal_status.get('reason')}")
+        except Exception as renewal_error:
+            print(f"⚠️ [Gmail] Watch renewal check failed: {renewal_error}")
+            # Don't fail the webhook, just log the error
 
         # Process the notification
         result = pubsub_handler.process_notification(pubsub_message)

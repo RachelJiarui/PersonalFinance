@@ -6,8 +6,9 @@ Handles OAuth authentication and Gmail API interactions
 import base64
 import json
 import os
+import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from google.cloud import firestore
 from google.oauth2.credentials import Credentials
@@ -171,6 +172,93 @@ class GmailService:
         )
 
         return response
+
+    def get_watch_status(self) -> Tuple[bool, Optional[int], Optional[int]]:
+        """
+        Get current watch status from Firestore
+
+        Returns:
+            Tuple of (is_active, expiration_ms, seconds_remaining)
+            - is_active: True if watch exists and hasn't expired
+            - expiration_ms: Expiration timestamp in milliseconds (from Gmail API)
+            - seconds_remaining: Seconds until expiration (None if expired/no watch)
+        """
+        doc = self.db.collection("gmail_watch").document(self.user_email).get()
+        if not doc.exists:
+            return False, None, None
+
+        data = doc.to_dict()
+        expiration_ms = data.get("expiration")
+
+        if not expiration_ms:
+            return False, None, None
+
+        # Gmail API returns expiration in milliseconds
+        expiration_ms = int(expiration_ms)
+        current_ms = int(time.time() * 1000)
+        remaining_ms = expiration_ms - current_ms
+
+        if remaining_ms <= 0:
+            return False, expiration_ms, 0
+
+        return True, expiration_ms, remaining_ms // 1000
+
+    def check_and_renew_watch(self, threshold_hours: int = 24) -> Dict:
+        """
+        Check if watch needs renewal and renew if necessary.
+
+        Args:
+            threshold_hours: Renew if less than this many hours remaining (default 24)
+
+        Returns:
+            Dict with status info:
+            - renewed: bool - whether watch was renewed
+            - reason: str - why renewal did/didn't happen
+            - expiration: int - current expiration timestamp (ms)
+            - seconds_remaining: int - seconds until expiration
+        """
+        is_active, expiration_ms, seconds_remaining = self.get_watch_status()
+        threshold_seconds = threshold_hours * 3600
+
+        # Case 1: No watch exists or already expired
+        if not is_active or seconds_remaining is None or seconds_remaining <= 0:
+            print(f"🔄 [Gmail] Watch expired or missing, renewing...")
+            try:
+                response = self.setup_push_notifications()
+                return {
+                    "renewed": True,
+                    "reason": "watch_expired_or_missing",
+                    "expiration": response.get("expiration"),
+                    "seconds_remaining": 7 * 24 * 3600,  # ~7 days
+                }
+            except Exception as e:
+                print(f"❌ [Gmail] Watch renewal failed: {e}")
+                raise
+
+        # Case 2: Watch exists but expiring soon
+        if seconds_remaining < threshold_seconds:
+            hours_remaining = seconds_remaining / 3600
+            print(f"🔄 [Gmail] Watch expiring in {hours_remaining:.1f}h, renewing...")
+            try:
+                response = self.setup_push_notifications()
+                return {
+                    "renewed": True,
+                    "reason": f"expiring_soon_{hours_remaining:.1f}h",
+                    "expiration": response.get("expiration"),
+                    "seconds_remaining": 7 * 24 * 3600,
+                }
+            except Exception as e:
+                print(f"❌ [Gmail] Watch renewal failed: {e}")
+                raise
+
+        # Case 3: Watch is healthy, no action needed
+        hours_remaining = seconds_remaining / 3600
+        return {
+            "renewed": False,
+            "reason": f"healthy_{hours_remaining:.1f}h_remaining",
+            "expiration": expiration_ms,
+            "seconds_remaining": seconds_remaining,
+        }
 
     def get_message(self, message_id: str) -> Optional[Dict]:
         """Fetch a specific Gmail message by ID"""
