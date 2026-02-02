@@ -27,7 +27,8 @@ struct BudgetCategory: Identifiable, Codable, Equatable {
 
     // Helper methods for budget calculations
     func dollarAmount(monthlyTakeHome: Double) -> Double {
-        monthlyTakeHome * (percentage / 100.0)
+        // Round to 2 decimal places to avoid floating point precision issues
+        (monthlyTakeHome * (percentage / 100.0) * 100).rounded() / 100
     }
 
     // Calculate spending ratio for progress ring (0.0 to 1.0+)

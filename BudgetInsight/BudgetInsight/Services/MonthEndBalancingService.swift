@@ -256,7 +256,7 @@ class MonthEndBalancingService: ObservableObject {
                 isBalanced: true,
                 balancedAt: Date(),
                 balancingTransactionIds: transactionIds,
-                netSavings: nil,
+                diffSpending: nil,
                 categoriesProcessed: nil
             )
 
@@ -293,7 +293,7 @@ class MonthEndBalancingService: ObservableObject {
             return nil
         }
 
-        // Calculate totals
+        // Calculate totals (for display purposes)
         let totalIncome =
             monthTransactions
             .filter { !$0.isExpense }
@@ -304,8 +304,6 @@ class MonthEndBalancingService: ObservableObject {
             .filter { $0.isExpense }
             .reduce(0.0) { $0 + $1.amount }
 
-        let netSavings = monthlyTakeHome + (totalIncome - totalSpending)
-
         // Calculate category balances using historical categories
         let categoryBalances = await calculateCategoryBalances(
             year: year,
@@ -315,14 +313,30 @@ class MonthEndBalancingService: ObservableObject {
             targetDate: lastDayOfMonth
         )
 
+        // Calculate diffSpending from category balances (sum of savings minus deficits)
+        // This ensures the net savings/deficit matches the category breakdown
+        // Round to 2 decimal places to avoid floating point precision issues
+        let diffSpendingRaw = categoryBalances.reduce(0.0) {
+            $0 + ($1.budgetAmount - $1.actualSpending)
+        }
+        let diffSpending = (diffSpendingRaw * 100).rounded() / 100
+
+        // Calculate fund/debt allocations for this month
+        let fundDebtAllocations = calculateFundDebtAllocations(
+            year: year,
+            month: month,
+            transactions: monthTransactions
+        )
+
         return MonthWrappedStats(
             year: year,
             month: month,
             monthlyTakeHome: monthlyTakeHome,
             categoryBalances: categoryBalances,
+            fundDebtAllocations: fundDebtAllocations,
             totalIncome: totalIncome,
             totalSpending: totalSpending,
-            netSavings: netSavings,
+            diffSpending: diffSpending,
             transactionCount: monthTransactions.count
         )
     }
@@ -386,6 +400,78 @@ class MonthEndBalancingService: ObservableObject {
         }.filter { $0.hasBalance }  // Only include categories with savings or deficits
     }
 
+    private func calculateFundDebtAllocations(
+        year: Int,
+        month: Int,
+        transactions: [Transaction]
+    ) -> [FundDebtAllocation] {
+        let allocationService = AllocationService.shared
+        let fundService = FundService.shared
+        let debtService = DebtService.shared
+
+        // Use the existing getAllocationsForMonth helper and filter for fund/debt
+        let monthAllocations = allocationService.getAllocationsForMonth(year: year, month: month)
+        let fundDebtMonthAllocations = monthAllocations.filter {
+            $0.destinationType == .fund || $0.destinationType == .debt
+        }
+
+        print(
+            "🔍 [BalancingService] Found \(monthAllocations.count) total allocations for \(month)/\(year)"
+        )
+        print("🔍 [BalancingService] Found \(fundDebtMonthAllocations.count) fund/debt allocations")
+
+        var fundDebtAllocations: [FundDebtAllocation] = []
+
+        for allocation in fundDebtMonthAllocations {
+            // Find the transaction for this allocation
+            guard let transaction = transactions.first(where: { $0.id == allocation.transactionId })
+            else {
+                print(
+                    "⚠️ [BalancingService] Could not find transaction for allocation: \(allocation.transactionId)"
+                )
+                continue
+            }
+
+            let destinationName: String
+            let destinationIcon: String
+
+            if allocation.destinationType == .fund {
+                if let fund = fundService.getFundById(allocation.destinationId) {
+                    destinationName = fund.name
+                    destinationIcon = fund.icon
+                } else {
+                    destinationName = "Unknown Fund"
+                    destinationIcon = "dollarsign.circle"
+                }
+            } else {
+                if let debt = debtService.getDebtById(allocation.destinationId) {
+                    destinationName = debt.name
+                    destinationIcon = debt.icon
+                } else {
+                    destinationName = "Unknown Debt"
+                    destinationIcon = "creditcard"
+                }
+            }
+
+            fundDebtAllocations.append(
+                FundDebtAllocation(
+                    transactionId: transaction.id,
+                    transactionTitle: transaction.title,
+                    transactionDate: transaction.date,
+                    destinationType: allocation.destinationType,
+                    destinationId: allocation.destinationId,
+                    destinationName: destinationName,
+                    destinationIcon: destinationIcon,
+                    amount: allocation.amount,
+                    isExpense: transaction.isExpense
+                ))
+        }
+
+        print(
+            "🔍 [BalancingService] Returning \(fundDebtAllocations.count) fund/debt allocation rows")
+        return fundDebtAllocations.sorted { $0.transactionDate > $1.transactionDate }
+    }
+
     // MARK: - Auto-Allocation to Default Buckets
 
     func autoAllocateToDefaultBuckets(for stats: MonthWrappedStats) async throws -> [String] {
@@ -397,13 +483,13 @@ class MonthEndBalancingService: ObservableObject {
         )
 
         // Check if there are net savings or deficit
-        if abs(stats.netSavings) < 0.01 {
+        if abs(stats.diffSpending) < 0.01 {
             // Perfectly balanced - no transaction needed
             print("✅ [BalancingService] Month is perfectly balanced, no allocation needed")
             return []
         }
 
-        if stats.netSavings > 0 {
+        if stats.diffSpending > 0 {
             // Net savings - allocate to default fund
             guard let defaultFund = FundService.shared.getDefaultFund() else {
                 throw BalancingError.defaultFundNotFound
@@ -411,7 +497,7 @@ class MonthEndBalancingService: ObservableObject {
 
             var transaction = Transaction(
                 id: "",
-                amount: stats.netSavings,
+                amount: stats.diffSpending,
                 date: lastDayOfMonth,
                 title: "Month-End: Net Savings → \(defaultFund.name)",
                 isExpense: false,  // Income to the fund
@@ -436,14 +522,14 @@ class MonthEndBalancingService: ObservableObject {
                     transactionId: firestoreId,
                     destinationType: .fund,
                     destinationId: defaultFund.id,
-                    amount: stats.netSavings,
+                    amount: stats.diffSpending,
                     isExpense: false
                 )
             }
 
             transactionIds.append(firestoreId)
             print(
-                "✅ [BalancingService] Allocated $\(String(format: "%.2f", stats.netSavings)) to \(defaultFund.name)"
+                "✅ [BalancingService] Allocated $\(String(format: "%.2f", stats.diffSpending)) to \(defaultFund.name)"
             )
 
         } else {
@@ -452,7 +538,7 @@ class MonthEndBalancingService: ObservableObject {
                 throw BalancingError.defaultDebtNotFound
             }
 
-            let deficitAmount = abs(stats.netSavings)
+            let deficitAmount = abs(stats.diffSpending)
 
             var transaction = Transaction(
                 id: "",

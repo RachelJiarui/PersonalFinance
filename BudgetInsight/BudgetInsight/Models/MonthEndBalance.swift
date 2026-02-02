@@ -9,7 +9,7 @@ struct MonthEndBalance: Identifiable, Codable {
     let balancingTransactionIds: [String]  // IDs of transactions created during balancing
 
     // Optional metadata for audit trail
-    let netSavings: Double?  // Total savings/deficit for the month
+    let diffSpending: Double?  // Total savings/deficit for the month
     let categoriesProcessed: Int?
 
     init(
@@ -18,7 +18,7 @@ struct MonthEndBalance: Identifiable, Codable {
         isBalanced: Bool = false,
         balancedAt: Date? = nil,
         balancingTransactionIds: [String] = [],
-        netSavings: Double? = nil,
+        diffSpending: Double? = nil,
         categoriesProcessed: Int? = nil
     ) {
         self.year = year
@@ -26,7 +26,7 @@ struct MonthEndBalance: Identifiable, Codable {
         self.isBalanced = isBalanced
         self.balancedAt = balancedAt
         self.balancingTransactionIds = balancingTransactionIds
-        self.netSavings = netSavings
+        self.diffSpending = diffSpending
         self.categoriesProcessed = categoriesProcessed
     }
 }

@@ -7,12 +7,12 @@ struct BalancingSummaryView: View {
     @StateObject private var debtService = DebtService.shared
 
     private var destinationInfo: (name: String, amount: Double, isDebt: Bool)? {
-        if stats.netSavings > 0 {
+        if stats.diffSpending > 0 {
             // Positive savings - goes to default fund
-            return ("General Savings", stats.netSavings, false)
-        } else if stats.netSavings < 0 {
+            return ("General Savings", stats.diffSpending, false)
+        } else if stats.diffSpending < 0 {
             // Deficit - goes to default debt
-            return ("General Debt", abs(stats.netSavings), true)
+            return ("General Debt", abs(stats.diffSpending), true)
         }
         return nil
     }

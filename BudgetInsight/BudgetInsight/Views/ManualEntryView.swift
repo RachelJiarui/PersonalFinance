@@ -8,6 +8,10 @@ struct AllocationItem: Identifiable {
 }
 
 struct ManualEntryView: View {
+    // Optional date restriction for month-end review
+    var restrictToYear: Int? = nil
+    var restrictToMonth: Int? = nil
+
     @Environment(\.dismiss) var dismiss
     @StateObject private var storageService = TransactionStorageService.shared
     @StateObject private var budgetService = BudgetService.shared
@@ -34,6 +38,47 @@ struct ManualEntryView: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var isSaving: Bool = false
+
+    // Computed property for date restriction
+    private var isDateRestricted: Bool {
+        restrictToYear != nil && restrictToMonth != nil
+    }
+
+    private var isDateInRestrictedMonth: Bool {
+        guard let year = restrictToYear, let month = restrictToMonth else { return true }
+        let calendar = Calendar.current
+        let dateYear = calendar.component(.year, from: date)
+        let dateMonth = calendar.component(.month, from: date)
+        return dateYear == year && dateMonth == month
+    }
+
+    private var restrictedMonthName: String {
+        guard let year = restrictToYear, let month = restrictToMonth else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        let calendar = Calendar.current
+        let components = DateComponents(year: year, month: month)
+        if let date = calendar.date(from: components) {
+            return "\(formatter.string(from: date)) \(year)"
+        }
+        return "Month \(month) \(year)"
+    }
+
+    // Filter alerts to show only those from the restricted month (if applicable)
+    private var availableAlerts: [TransactionAlert] {
+        guard let year = restrictToYear, let month = restrictToMonth else {
+            // No restriction - show all unresolved alerts
+            return alertService.unresolvedAlerts
+        }
+
+        // Filter to only show alerts from the restricted month
+        let calendar = Calendar.current
+        return alertService.unresolvedAlerts.filter { alert in
+            let alertYear = calendar.component(.year, from: alert.transactionDate)
+            let alertMonth = calendar.component(.month, from: alert.transactionDate)
+            return alertYear == year && alertMonth == month
+        }
+    }
 
     var body: some View {
         NavigationView {
@@ -68,6 +113,12 @@ struct ManualEntryView: View {
                         selection: $date,
                         displayedComponents: [.date]
                     )
+
+                    if isDateRestricted && !isDateInRestrictedMonth {
+                        Text("Date must be in \(restrictedMonthName)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
                 }
 
                 // MARK: - Transaction Type (Checkbox style)
@@ -91,7 +142,7 @@ struct ManualEntryView: View {
                     Picker("Transaction Alert", selection: $selectedAlertId) {
                         Text("None").tag(nil as String?)
 
-                        ForEach(alertService.unresolvedAlerts) { alert in
+                        ForEach(availableAlerts) { alert in
                             VStack(alignment: .leading) {
                                 Text("\(alert.merchant) - $\(alert.amount, specifier: "%.2f")")
                                 Text(alert.transactionDate, style: .date)
@@ -103,7 +154,7 @@ struct ManualEntryView: View {
                     }
                     .onChange(of: selectedAlertId) { newAlertId in
                         if let alertId = newAlertId,
-                            let alert = alertService.unresolvedAlerts.first(where: {
+                            let alert = availableAlerts.first(where: {
                                 $0.id == alertId
                             })
                         {
@@ -212,8 +263,9 @@ struct ManualEntryView: View {
         let hasAmount = !amount.isEmpty && Double(amount) != nil
         let hasTitle = !title.isEmpty
         let hasValidAllocations = isAllocationValid
+        let dateValid = isDateInRestrictedMonth
 
-        return hasAmount && hasTitle && hasValidAllocations
+        return hasAmount && hasTitle && hasValidAllocations && dateValid
     }
 
     private var isAllocationValid: Bool {
@@ -248,6 +300,15 @@ struct ManualEntryView: View {
         // Load transaction alerts
         Task {
             await alertService.fetchAlerts()
+        }
+
+        // Set default date to first day of restricted month if applicable
+        if let year = restrictToYear, let month = restrictToMonth {
+            let calendar = Calendar.current
+            if let firstDay = calendar.date(from: DateComponents(year: year, month: month, day: 1))
+            {
+                date = firstDay
+            }
         }
 
         // Create default allocation if amount is set

@@ -24,20 +24,20 @@ struct MonthWrappedView: View {
                 }
                 .padding(.top)
 
-                // Net Savings - MOST IMPORTANT
+                // Diff Spending - MOST IMPORTANT
                 VStack(spacing: 12) {
-                    Text("Net Savings")
+                    Text(stats.diffSpending >= 0 ? "Net Savings" : "Net Deficit")
                         .font(.headline)
                         .foregroundColor(.secondary)
 
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(stats.netSavings >= 0 ? "+" : "")
-                        Text("$\(String(format: "%.2f", abs(stats.netSavings)))")
+                        Text(stats.diffSpending >= 0 ? "+" : "-")
+                        Text("$\(String(format: "%.2f", abs(stats.diffSpending)))")
                             .font(.system(size: 48, weight: .bold, design: .rounded))
                     }
-                    .foregroundColor(stats.netSavings >= 0 ? .green : .red)
+                    .foregroundColor(stats.diffSpending >= 0 ? .green : .red)
 
-                    if stats.netSavings >= 0 {
+                    if stats.diffSpending >= 0 {
                         Text("Great job! You saved money this month.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -51,6 +51,46 @@ struct MonthWrappedView: View {
                 .background(Color(.secondarySystemBackground))
                 .cornerRadius(16)
                 .padding(.horizontal)
+
+                // Fund & Debt Allocations
+                if !stats.fundDebtAllocations.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Fund & Debt Transactions")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        if !stats.fundAllocations.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Funds")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+
+                                ForEach(stats.fundAllocations) { allocation in
+                                    FundDebtAllocationRow(allocation: allocation)
+                                }
+                            }
+                        }
+
+                        if !stats.debtAllocations.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Debts")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                    .padding(.top, stats.fundAllocations.isEmpty ? 0 : 8)
+
+                                ForEach(stats.debtAllocations) { allocation in
+                                    FundDebtAllocationRow(allocation: allocation)
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                }
 
                 // Monthly Statistics
                 VStack(alignment: .leading, spacing: 16) {
@@ -208,6 +248,54 @@ struct CategoryBalanceRow: View {
                 )
                 .font(.headline)
                 .foregroundColor(isSurplus ? .green : .orange)
+            }
+        }
+        .padding()
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(8)
+        .padding(.horizontal)
+    }
+}
+
+struct FundDebtAllocationRow: View {
+    let allocation: FundDebtAllocation
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        return formatter
+    }
+
+    var body: some View {
+        HStack {
+            Image(systemName: allocation.destinationIcon)
+                .foregroundColor(allocation.destinationType == .fund ? .blue : .orange)
+                .frame(width: 40)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(allocation.destinationName)
+                    .font(.body)
+
+                Text(allocation.transactionTitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(
+                    allocation.isExpense
+                        ? "-$\(String(format: "%.2f", allocation.amount))"
+                        : "+$\(String(format: "%.2f", allocation.amount))"
+                )
+                .font(.headline)
+                .foregroundColor(allocation.isExpense ? .red : .green)
+
+                Text(dateFormatter.string(from: allocation.transactionDate))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()

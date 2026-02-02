@@ -6,13 +6,15 @@ struct CategoryBalance {
     let actualSpending: Double
     var allocatedTo: BalancingDestination?
 
-    // Computed properties
+    // Computed properties (rounded to 2 decimal places)
     var surplus: Double {
-        max(0, budgetAmount - actualSpending)
+        let value = max(0, budgetAmount - actualSpending)
+        return (value * 100).rounded() / 100
     }
 
     var deficit: Double {
-        max(0, actualSpending - budgetAmount)
+        let value = max(0, actualSpending - budgetAmount)
+        return (value * 100).rounded() / 100
     }
 
     var hasBalance: Bool {

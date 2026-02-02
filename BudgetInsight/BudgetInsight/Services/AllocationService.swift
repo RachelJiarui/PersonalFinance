@@ -22,16 +22,41 @@ class AllocationService: ObservableObject {
 
     func fetchDataFromFirestore() async {
         do {
+            print("🔗 [AllocationService] Fetching allocations from backend...")
             let firestoreAllocations = try await BackendService.shared.fetchAllocations()
+            print(
+                "✅ [AllocationService] Fetched \(firestoreAllocations.count) allocations from backend"
+            )
+
+            // Log breakdown by type
+            let fundAllocations = firestoreAllocations.filter { $0.destinationType == .fund }
+            let debtAllocations = firestoreAllocations.filter { $0.destinationType == .debt }
+            let categoryAllocations = firestoreAllocations.filter {
+                $0.destinationType == .category
+            }
+            print(
+                "📊 [AllocationService] Breakdown - Categories: \(categoryAllocations.count), Funds: \(fundAllocations.count), Debts: \(debtAllocations.count)"
+            )
 
             await MainActor.run {
                 // Merge Firestore data with local data instead of replacing
                 // Keep local allocations that aren't in Firestore yet (empty IDs)
                 let localOnlyAllocations = self.allocations.filter { $0.id.isEmpty }
+                print(
+                    "📊 [AllocationService] Local-only allocations (pending sync): \(localOnlyAllocations.count)"
+                )
+                for allocation in localOnlyAllocations {
+                    print(
+                        "   📌 Local allocation: type=\(allocation.destinationType.rawValue), destId=\(allocation.destinationId), amount=\(allocation.amount), txId=\(allocation.transactionId)"
+                    )
+                }
 
                 // Combine: Firestore allocations + local-only allocations
                 self.allocations = firestoreAllocations + localOnlyAllocations
                 self.saveAllocations()
+                print(
+                    "✅ [AllocationService] Total allocations after merge: \(self.allocations.count)"
+                )
             }
         } catch {
             print("❌ [AllocationService] Error fetching allocations: \(error)")

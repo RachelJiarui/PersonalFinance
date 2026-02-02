@@ -791,19 +791,28 @@ class BackendService: ObservableObject {
         }
 
         let url = URL(string: urlString)!
+        print("🔗 [BackendService] Fetching allocations from: \(urlString)")
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
         else {
+            print(
+                "❌ [BackendService] Allocations fetch failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1)"
+            )
             throw BackendError.invalidResponse
         }
+
+        print("✅ [BackendService] Received allocations response: HTTP \(httpResponse.statusCode)")
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let allocationsArray = json["allocations"] as? [[String: Any]]
         else {
+            print("❌ [BackendService] Failed to parse allocations JSON")
             throw BackendError.invalidData
         }
+
+        print("📊 [BackendService] Raw allocations count from backend: \(allocationsArray.count)")
 
         let dateFormatter = ISO8601DateFormatter()
         var allocations: [TransactionAllocation] = []
@@ -828,8 +837,12 @@ class BackendService: ObservableObject {
                     allocatedAt: allocatedAt
                 )
                 allocations.append(allocation)
+            } else {
+                print("⚠️ [BackendService] Failed to parse allocation: \(dict)")
             }
         }
+
+        print("✅ [BackendService] Successfully parsed \(allocations.count) allocations")
 
         return allocations
     }
