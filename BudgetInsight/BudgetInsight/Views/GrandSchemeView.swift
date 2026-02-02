@@ -218,6 +218,7 @@ struct TransactionDetailView: View {
     @StateObject private var debtService = DebtService.shared
     @StateObject private var transactionService = TransactionStorageService.shared
     @StateObject private var backendService = BackendService.shared
+    @StateObject private var alertService = TransactionAlertService.shared
     @State private var showEditSheet: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var isDeleting: Bool = false
@@ -353,6 +354,12 @@ struct TransactionDetailView: View {
                 // Delete from Firestore first
                 try await backendService.deleteTransaction(transaction.id)
 
+                // Unlink from transaction alert if linked
+                if let alertId = transaction.transactionAlertId {
+                    try await alertService.unlinkTransactionFromAlert(alertId: alertId)
+                    print("✅ [TransactionDetail] Unlinked transaction from alert: \(alertId)")
+                }
+
                 await MainActor.run {
                     // Delete allocations
                     for allocation in allocations {
@@ -378,6 +385,13 @@ struct TransactionDetailView: View {
                         allocationService.deleteAllocation(allocationId: allocation.id)
                     }
                     transactionService.deleteTransaction(id: transaction.id)
+
+                    // Try to unlink alert even on error
+                    if let alertId = transaction.transactionAlertId {
+                        Task {
+                            try? await alertService.unlinkTransactionFromAlert(alertId: alertId)
+                        }
+                    }
 
                     isDeleting = false
                     dismiss()

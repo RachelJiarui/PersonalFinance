@@ -5,9 +5,32 @@ struct MonthWrappedView: View {
     let onReviewData: () -> Void
     let onNext: () -> Void
 
+    @StateObject private var alertService = TransactionAlertService.shared
+
+    // Unresolved alerts from the month being reviewed
+    private var unresolvedAlertsForMonth: [TransactionAlert] {
+        let calendar = Calendar.current
+        return alertService.unresolvedAlerts.filter { alert in
+            let alertYear = calendar.component(.year, from: alert.transactionDate)
+            let alertMonth = calendar.component(.month, from: alert.transactionDate)
+            return alertYear == stats.year && alertMonth == stats.month
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                // Unlinked Transaction Alerts Warning
+                if !unresolvedAlertsForMonth.isEmpty {
+                    UnlinkedAlertsWarningView(
+                        alertCount: unresolvedAlertsForMonth.count,
+                        monthName: stats.monthName,
+                        onReviewData: onReviewData
+                    )
+                    .padding(.horizontal)
+                    .padding(.top)
+                }
+
                 // Header
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.checkmark")
@@ -22,7 +45,7 @@ struct MonthWrappedView: View {
                         .font(.headline)
                         .foregroundColor(.secondary)
                 }
-                .padding(.top)
+                .padding(.top, unresolvedAlertsForMonth.isEmpty ? 0 : 0)
 
                 // Diff Spending - MOST IMPORTANT
                 VStack(spacing: 12) {
@@ -188,6 +211,12 @@ struct MonthWrappedView: View {
             .padding()
             .background(Color(.systemBackground))
         }
+        .onAppear {
+            // Fetch transaction alerts to check for unlinked ones
+            Task {
+                await alertService.fetchAlerts()
+            }
+        }
     }
 }
 
@@ -254,6 +283,59 @@ struct CategoryBalanceRow: View {
         .background(Color(.tertiarySystemBackground))
         .cornerRadius(8)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Unlinked Alerts Warning View
+
+struct UnlinkedAlertsWarningView: View {
+    let alertCount: Int
+    let monthName: String
+    let onReviewData: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Unlinked Transaction Alerts")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text(
+                        "You have \(alertCount) transaction \(alertCount == 1 ? "alert" : "alerts") from \(monthName) that \(alertCount == 1 ? "hasn't" : "haven't") been linked to a transaction yet."
+                    )
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            Button(action: onReviewData) {
+                HStack {
+                    Image(systemName: "arrow.right.circle.fill")
+                    Text("Review & Link Transactions")
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 
