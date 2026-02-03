@@ -71,7 +71,8 @@ class AllocationService: ObservableObject {
         destinationType: AllocationType,
         destinationId: String,
         amount: Double,
-        isExpense: Bool? = nil
+        isExpense: Bool? = nil,
+        skipBalanceUpdate: Bool = false
     ) -> TransactionAllocation {
         let newAllocation = TransactionAllocation(
             id: "",  // Firestore will generate this
@@ -97,6 +98,11 @@ class AllocationService: ObservableObject {
             } catch {
                 print("❌ [AllocationService] Error creating allocation: \(error)")
             }
+        }
+
+        // Skip balance update if requested (e.g., for initial debt creation where balance is already set)
+        guard !skipBalanceUpdate else {
+            return newAllocation
         }
 
         // Determine if transaction is expense or income

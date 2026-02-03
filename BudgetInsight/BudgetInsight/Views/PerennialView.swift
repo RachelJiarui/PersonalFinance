@@ -563,13 +563,13 @@ struct AddDebtView: View {
     }
 
     private var isValid: Bool {
-        !name.isEmpty && Double(goal) != nil
+        // Name is required; goal can be empty (treated as 0) or a valid number
+        !name.isEmpty && (goal.isEmpty || Double(goal) != nil)
     }
 
     private func saveDebt() {
-        guard let goalValue = Double(goal) else {
-            return
-        }
+        // Empty goal is treated as 0
+        let goalValue = goal.isEmpty ? 0.0 : (Double(goal) ?? 0.0)
 
         let deadlineValue = hasDeadline ? deadline : nil
 

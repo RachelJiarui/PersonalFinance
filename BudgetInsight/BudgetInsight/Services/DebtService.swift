@@ -136,12 +136,68 @@ class DebtService: ObservableObject {
                         self.saveDebts()
                     }
                 }
+
+                // If goal > 0, create a transaction and allocation to record this expense
+                if goal > 0 {
+                    await self.createInitialDebtTransaction(
+                        debtId: firestoreId,
+                        debtName: name,
+                        amount: goal
+                    )
+                }
             } catch {
                 print("❌ [DebtService] Error creating Debt in Firestore: \(error)")
             }
         }
 
         return newDebt
+    }
+
+    /// Creates a transaction and allocation for the initial debt amount
+    /// This ensures the debt expense shows up in month-end calculations
+    private func createInitialDebtTransaction(
+        debtId: String,
+        debtName: String,
+        amount: Double
+    ) async {
+        // Create an expense transaction for the debt amount
+        let transaction = Transaction(
+            id: "",
+            amount: amount,
+            date: Date(),
+            title: "Debt: \(debtName)",
+            isExpense: true,
+            timestamp: Date()
+        )
+
+        do {
+            // Save transaction to Firestore
+            let transactionId = try await BackendService.shared.createTransaction(transaction)
+
+            // Save transaction locally
+            await MainActor.run {
+                var transactionWithId = transaction
+                transactionWithId.id = transactionId
+                TransactionStorageService.shared.saveTransaction(transactionWithId)
+            }
+
+            // Create allocation linking transaction to debt
+            // Skip balance update since debt balance is already set to goal
+            await MainActor.run {
+                _ = AllocationService.shared.createAllocation(
+                    transactionId: transactionId,
+                    destinationType: .debt,
+                    destinationId: debtId,
+                    amount: amount,
+                    isExpense: true,
+                    skipBalanceUpdate: true
+                )
+            }
+
+            print("✅ [DebtService] Created initial transaction and allocation for debt \(debtName)")
+        } catch {
+            print("❌ [DebtService] Error creating initial debt transaction: \(error)")
+        }
     }
 
     func updateDebt(
