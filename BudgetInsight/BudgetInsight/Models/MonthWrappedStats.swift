@@ -28,7 +28,12 @@ struct MonthWrappedStats {
     let totalIncome: Double
     let totalSpending: Double
     let diffSpending: Double  // monthlyTakeHome (budget) - spending (can be negative)
-    let transactionCount: Int
+    let expenseTransactionCount: Int
+    let incomeTransactionCount: Int
+
+    var transactionCount: Int {
+        expenseTransactionCount + incomeTransactionCount
+    }
 
     // Computed helpers
     var hasSurplus: Bool { diffSpending > 0 }

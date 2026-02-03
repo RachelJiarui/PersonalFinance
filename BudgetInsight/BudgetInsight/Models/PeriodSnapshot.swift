@@ -15,7 +15,12 @@ struct PeriodSnapshot: Identifiable, Codable, Equatable {
 
     // Metadata
     let createdAt: Date
-    let transactionCount: Int
+    let expenseTransactionCount: Int
+    let incomeTransactionCount: Int
+
+    var transactionCount: Int {
+        expenseTransactionCount + incomeTransactionCount
+    }
 
     init(
         id: UUID = UUID(),
@@ -26,7 +31,8 @@ struct PeriodSnapshot: Identifiable, Codable, Equatable {
         savings: Double,
         budgetPlanId: String,
         createdAt: Date = Date(),
-        transactionCount: Int
+        expenseTransactionCount: Int,
+        incomeTransactionCount: Int
     ) {
         self.id = id
         self.year = year
@@ -36,7 +42,8 @@ struct PeriodSnapshot: Identifiable, Codable, Equatable {
         self.savings = savings
         self.budgetPlanId = budgetPlanId
         self.createdAt = createdAt
-        self.transactionCount = transactionCount
+        self.expenseTransactionCount = expenseTransactionCount
+        self.incomeTransactionCount = incomeTransactionCount
     }
 
     var periodType: PeriodType {

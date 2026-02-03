@@ -929,40 +929,136 @@ class BackendService: ObservableObject {
             throw BackendError.invalidData
         }
 
-        let dateFormatter = ISO8601DateFormatter()
         var snapshots: [PeriodSnapshot] = []
 
         for dict in snapshotsArray {
-            if let idString = dict["id"] as? String,
-                let id = UUID(uuidString: idString),
-                let year = dict["year"] as? Int,
+            // Required fields (except id and created_at which we handle specially)
+            guard let year = dict["year"] as? Int,
                 let monthlyTakeHome = dict["monthly_take_home"] as? Double,
                 let totalSpending = dict["total_spending"] as? Double,
                 let savings = dict["savings"] as? Double,
-                let budgetPlanId = dict["budget_plan_id"] as? String,
-                let transactionCount = dict["transaction_count"] as? Int,
-                let createdAtString = dict["created_at"] as? String,
-                let createdAt = dateFormatter.date(from: createdAtString)
-            {
-
-                let month = dict["month"] as? Int
-
-                let snapshot = PeriodSnapshot(
-                    id: id,
-                    year: year,
-                    month: month,
-                    monthlyTakeHome: monthlyTakeHome,
-                    totalSpending: totalSpending,
-                    savings: savings,
-                    budgetPlanId: budgetPlanId,
-                    createdAt: createdAt,
-                    transactionCount: transactionCount
-                )
-                snapshots.append(snapshot)
+                let budgetPlanId = dict["budget_plan_id"] as? String
+            else {
+                continue
             }
+
+            // Parse transaction counts - support both old and new field names
+            let expenseTransactionCount: Int
+            let incomeTransactionCount: Int
+            if let expenseCount = dict["expense_transaction_count"] as? Int,
+                let incomeCount = dict["income_transaction_count"] as? Int
+            {
+                // New format with separate counts
+                expenseTransactionCount = expenseCount
+                incomeTransactionCount = incomeCount
+            } else if let transactionCount = dict["transaction_count"] as? Int {
+                // Legacy format - assume all were expense transactions
+                expenseTransactionCount = transactionCount
+                incomeTransactionCount = 0
+            } else {
+                continue
+            }
+
+            // Generate a deterministic UUID from the Firestore document ID
+            // This ensures the same document always maps to the same UUID
+            let id: UUID
+            if let idString = dict["id"] as? String {
+                // Create a deterministic UUID using a hash of the Firestore ID
+                id = UUID(uuidString: idString) ?? uuidFromString(idString)
+            } else {
+                id = UUID()
+            }
+
+            // Parse created_at with fallback - Firestore timestamps may come in various formats
+            let createdAt = parseFirestoreDate(dict["created_at"]) ?? Date()
+
+            let month = dict["month"] as? Int
+
+            let snapshot = PeriodSnapshot(
+                id: id,
+                year: year,
+                month: month,
+                monthlyTakeHome: monthlyTakeHome,
+                totalSpending: totalSpending,
+                savings: savings,
+                budgetPlanId: budgetPlanId,
+                createdAt: createdAt,
+                expenseTransactionCount: expenseTransactionCount,
+                incomeTransactionCount: incomeTransactionCount
+            )
+            snapshots.append(snapshot)
         }
 
         return snapshots
+    }
+
+    /// Creates a deterministic UUID from a string (for Firestore document IDs)
+    private func uuidFromString(_ string: String) -> UUID {
+        // Create a deterministic UUID by hashing the string
+        // Use the string's hash to create a consistent UUID
+        var hasher = Hasher()
+        hasher.combine(string)
+        let hash = hasher.finalize()
+
+        // Create a UUID-like string from the hash
+        let hashString = String(format: "%08x", abs(hash))
+        let uuidString =
+            "00000000-0000-0000-0000-\(hashString.padding(toLength: 12, withPad: "0", startingAt: 0))"
+        return UUID(uuidString: uuidString) ?? UUID()
+    }
+
+    /// Parses Firestore dates which may come in various formats
+    private func parseFirestoreDate(_ value: Any?) -> Date? {
+        guard let value = value else { return nil }
+
+        // Try as ISO8601 string first
+        if let stringValue = value as? String {
+            let iso8601Formatter = ISO8601DateFormatter()
+            if let date = iso8601Formatter.date(from: stringValue) {
+                return date
+            }
+
+            // Try with fractional seconds
+            iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = iso8601Formatter.date(from: stringValue) {
+                return date
+            }
+
+            // Try common date formats
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+            let formats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd HH:mm:ss",
+            ]
+
+            for format in formats {
+                dateFormatter.dateFormat = format
+                if let date = dateFormatter.date(from: stringValue) {
+                    return date
+                }
+            }
+        }
+
+        // Try as Unix timestamp (seconds or milliseconds)
+        if let timestamp = value as? Double {
+            // If timestamp is very large, it's likely milliseconds
+            if timestamp > 1_000_000_000_000 {
+                return Date(timeIntervalSince1970: timestamp / 1000)
+            }
+            return Date(timeIntervalSince1970: timestamp)
+        }
+
+        // Try as Firestore timestamp dictionary ({"_seconds": ..., "_nanoseconds": ...})
+        if let timestampDict = value as? [String: Any],
+            let seconds = timestampDict["_seconds"] as? Double
+        {
+            return Date(timeIntervalSince1970: seconds)
+        }
+
+        return nil
     }
 
     func createSnapshot(_ snapshot: PeriodSnapshot) async throws -> String {
@@ -978,7 +1074,8 @@ class BackendService: ObservableObject {
             "total_spending": snapshot.totalSpending,
             "savings": snapshot.savings,
             "budget_plan_id": snapshot.budgetPlanId,
-            "transaction_count": snapshot.transactionCount,
+            "expense_transaction_count": snapshot.expenseTransactionCount,
+            "income_transaction_count": snapshot.incomeTransactionCount,
             "created_at": dateFormatter.string(from: snapshot.createdAt),
         ]
 

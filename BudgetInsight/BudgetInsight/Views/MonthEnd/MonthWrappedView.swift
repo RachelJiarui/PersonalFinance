@@ -136,10 +136,17 @@ struct MonthWrappedView: View {
                     )
 
                     StatRow(
-                        icon: "doc.text.fill",
-                        iconColor: .blue,
-                        label: "Transactions",
-                        value: "\(stats.transactionCount)"
+                        icon: "arrow.up.doc.fill",
+                        iconColor: .red,
+                        label: "Expense Transactions",
+                        value: "\(stats.expenseTransactionCount)"
+                    )
+
+                    StatRow(
+                        icon: "arrow.down.doc.fill",
+                        iconColor: .green,
+                        label: "Income Transactions",
+                        value: "\(stats.incomeTransactionCount)"
                     )
                 }
                 .padding()

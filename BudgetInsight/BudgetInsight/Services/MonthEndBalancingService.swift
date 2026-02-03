@@ -337,7 +337,8 @@ class MonthEndBalancingService: ObservableObject {
             totalIncome: totalIncome,
             totalSpending: totalSpending,
             diffSpending: diffSpending,
-            transactionCount: monthTransactions.count
+            expenseTransactionCount: monthTransactions.filter { $0.isExpense }.count,
+            incomeTransactionCount: monthTransactions.filter { !$0.isExpense }.count
         )
     }
 

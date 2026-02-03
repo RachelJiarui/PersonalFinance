@@ -51,9 +51,14 @@ struct HistoricalBudgetDetailView: View {
 
             VStack(spacing: 8) {
                 InfoRow(label: "Active Period", value: plan.dateRangeString())
-                InfoRow(label: "Annual Salary", value: "$\(String(format: "%.2f", plan.annualSalary))")
-                InfoRow(label: "401(k) Contribution", value: "$\(String(format: "%.2f", plan.contribution401k))")
-                InfoRow(label: "Monthly Take-Home", value: "$\(String(format: "%.2f", plan.monthlyTakeHome))")
+                InfoRow(
+                    label: "Annual Salary", value: "$\(String(format: "%.2f", plan.annualSalary))")
+                InfoRow(
+                    label: "401(k) Contribution",
+                    value: "$\(String(format: "%.2f", plan.contribution401k))")
+                InfoRow(
+                    label: "Monthly Take-Home",
+                    value: "$\(String(format: "%.2f", plan.monthlyTakeHome))")
             }
             .padding()
             .background(Color(.secondarySystemBackground))
@@ -88,7 +93,9 @@ struct HistoricalBudgetDetailView: View {
                 .font(.headline)
 
             VStack(spacing: 8) {
-                InfoRow(label: "Budgeted", value: "$\(String(format: "%.2f", snapshot.monthlyTakeHome))")
+                InfoRow(
+                    label: "Budgeted", value: "$\(String(format: "%.2f", snapshot.monthlyTakeHome))"
+                )
                 InfoRow(label: "Spent", value: "$\(String(format: "%.2f", snapshot.totalSpending))")
                 InfoRow(
                     label: "Savings",
@@ -107,7 +114,8 @@ struct HistoricalBudgetDetailView: View {
 
         do {
             // Fetch the historical budget plan
-            budgetPlan = try await BackendService.shared.fetchBudgetPlan(planId: snapshot.budgetPlanId)
+            budgetPlan = try await BackendService.shared.fetchBudgetPlan(
+                planId: snapshot.budgetPlanId)
 
             guard let plan = budgetPlan else {
                 isLoading = false
@@ -147,7 +155,8 @@ struct HistoricalBudgetDetailView: View {
 
             var spending = 0.0
             for allocation in categoryAllocations {
-                if let transaction = transactions.first(where: { $0.id == allocation.transactionId }) {
+                if let transaction = transactions.first(where: { $0.id == allocation.transactionId }
+                ) {
                     if transaction.isExpense {
                         spending += allocation.amount
                     } else {
@@ -230,7 +239,11 @@ struct CategoryComparisonCard: View {
 
                     Rectangle()
                         .fill(percentageUsed > 100 ? Color.red : Color.blue)
-                        .frame(width: min(geometry.size.width, geometry.size.width * (percentageUsed / 100)), height: 6)
+                        .frame(
+                            width: min(
+                                geometry.size.width, geometry.size.width * (percentageUsed / 100)),
+                            height: 6
+                        )
                         .cornerRadius(3)
                 }
             }
@@ -271,7 +284,8 @@ struct HistoricalBudgetDetailView_Previews: PreviewProvider {
                     savings: 800,
                     budgetPlanId: "test-plan-id",
                     createdAt: Date(),
-                    transactionCount: 42
+                    expenseTransactionCount: 38,
+                    incomeTransactionCount: 4
                 )
             )
         }

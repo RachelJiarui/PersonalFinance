@@ -26,25 +26,37 @@ class SnapshotService: ObservableObject {
     ) async {
         let calendar = Calendar.current
 
-        // Filter transactions for this specific month
+        // Filter transactions for this specific month (all transactions, not just expenses)
         let monthTransactions = transactions.filter { transaction in
             let txMonth = calendar.component(.month, from: transaction.date)
             let txYear = calendar.component(.year, from: transaction.date)
-            return txMonth == month && txYear == year && transaction.isExpense
+            return txMonth == month && txYear == year
         }
 
-        let totalSpending = monthTransactions.reduce(0.0) { $0 + $1.amount }
-        let savings = monthlyTakeHome - totalSpending
+        // Calculate spending using allocation-based method (same as MonthEndBalancingService)
+        // This ensures the snapshot savings matches what was shown during month-end balancing
+        let (totalCategorySpending, savings) = await calculateAllocationBasedSpending(
+            year: year,
+            month: month,
+            monthlyTakeHome: monthlyTakeHome,
+            transactions: monthTransactions,
+            budgetPlanId: budgetPlanId
+        )
+
+        // Round all monetary values to 2 decimal places for consistency
+        let roundedTakeHome = (monthlyTakeHome * 100).rounded() / 100
+        let roundedSpending = (totalCategorySpending * 100).rounded() / 100
 
         let snapshot = PeriodSnapshot(
             year: year,
             month: month,
-            monthlyTakeHome: monthlyTakeHome,
-            totalSpending: totalSpending,
+            monthlyTakeHome: roundedTakeHome,
+            totalSpending: roundedSpending,
             savings: savings,
             budgetPlanId: budgetPlanId,
             createdAt: Date(),
-            transactionCount: monthTransactions.count
+            expenseTransactionCount: monthTransactions.filter { $0.isExpense }.count,
+            incomeTransactionCount: monthTransactions.filter { !$0.isExpense }.count
         )
 
         // Save to local storage first
@@ -65,11 +77,91 @@ class SnapshotService: ObservableObject {
 
         // Save to Firebase
         do {
-            let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
+            _ = try await BackendService.shared.createSnapshot(snapshot)
         } catch {
             print("❌ [SnapshotService] Failed to save monthly snapshot: \(error)")
             // Continue anyway - local storage succeeded
         }
+    }
+
+    /// Calculate spending based on allocations to budget categories (not raw transaction amounts)
+    /// This matches the calculation used in MonthEndBalancingService.calculateMonthStats()
+    private func calculateAllocationBasedSpending(
+        year: Int,
+        month: Int,
+        monthlyTakeHome: Double,
+        transactions: [Transaction],
+        budgetPlanId: String
+    ) async -> (totalSpending: Double, savings: Double) {
+        let calendar = Calendar.current
+        let budgetService = BudgetService.shared
+        let allocationService = AllocationService.shared
+
+        // Get the target date (last day of month) for fetching historical categories
+        var components = DateComponents()
+        components.year = year
+        components.month = month + 1
+        components.day = 0
+        let targetDate = calendar.date(from: components) ?? Date()
+
+        // Get categories that were active during this historical month
+        let categories = await budgetService.getActiveCategoriesForDate(targetDate)
+
+        var totalBudget = 0.0
+        var totalActualSpending = 0.0
+
+        for category in categories {
+            // Calculate budget amount for this category
+            let budgetAmount = category.dollarAmount(monthlyTakeHome: monthlyTakeHome)
+            totalBudget += budgetAmount
+
+            // Calculate actual spending for this category in this month
+            let categoryAllocations = allocationService.allocations.filter { allocation in
+                guard allocation.destinationType == .category else { return false }
+                guard allocation.destinationId == category.id else { return false }
+
+                // Find the transaction for this allocation
+                guard
+                    let transaction = transactions.first(where: {
+                        $0.id == allocation.transactionId
+                    })
+                else {
+                    return false
+                }
+
+                let txYear = calendar.component(.year, from: transaction.date)
+                let txMonth = calendar.component(.month, from: transaction.date)
+
+                return txYear == year && txMonth == month
+            }
+
+            // Sum up spending (expense allocations add, income allocations subtract as reimbursements)
+            for allocation in categoryAllocations {
+                if let transaction = transactions.first(where: { $0.id == allocation.transactionId }
+                ) {
+                    if transaction.isExpense {
+                        totalActualSpending += allocation.amount
+                    } else {
+                        totalActualSpending -= allocation.amount  // Reimbursement reduces spending
+                    }
+                }
+            }
+        }
+
+        // Round all values to 2 decimal places for consistency
+        let roundedSpending = (totalActualSpending * 100).rounded() / 100
+        let roundedBudget = (totalBudget * 100).rounded() / 100
+
+        // Savings = total budget - actual spending against categories
+        // Positive = under budget (saved money), Negative = over budget
+        let savings = ((roundedBudget - roundedSpending) * 100).rounded() / 100
+
+        print("📊 [SnapshotService] Allocation-based calculation for \(month)/\(year):")
+        print("   Total budget: $\(String(format: "%.2f", roundedBudget))")
+        print("   Category spending: $\(String(format: "%.2f", roundedSpending))")
+        print("   Savings (budget - spending): $\(String(format: "%.2f", savings))")
+
+        return (roundedSpending, savings)
     }
 
     func createYearlySnapshot(
@@ -78,28 +170,52 @@ class SnapshotService: ObservableObject {
         transactions: [Transaction],
         budgetPlanId: String
     ) async {
-        let annualTakeHome = monthlyTakeHome * 12.0
-
         let calendar = Calendar.current
 
-        // Filter transactions for this specific year
+        // Filter transactions for this specific year (all transactions, not just expenses)
         let yearTransactions = transactions.filter { transaction in
             let txYear = calendar.component(.year, from: transaction.date)
-            return txYear == year && transaction.isExpense
+            return txYear == year
         }
 
-        let totalSpending = yearTransactions.reduce(0.0) { $0 + $1.amount }
-        let savings = annualTakeHome - totalSpending
+        // Calculate spending using allocation-based method for each month, then sum
+        var totalYearSpending = 0.0
+        var totalYearSavings = 0.0
+
+        for month in 1...12 {
+            let monthTransactions = yearTransactions.filter { transaction in
+                let txMonth = calendar.component(.month, from: transaction.date)
+                return txMonth == month
+            }
+
+            if !monthTransactions.isEmpty {
+                let (spending, savings) = await calculateAllocationBasedSpending(
+                    year: year,
+                    month: month,
+                    monthlyTakeHome: monthlyTakeHome,
+                    transactions: monthTransactions,
+                    budgetPlanId: budgetPlanId
+                )
+                totalYearSpending += spending
+                totalYearSavings += savings
+            }
+        }
+
+        // Round all monetary values to 2 decimal places for consistency
+        let roundedAnnualTakeHome = ((monthlyTakeHome * 12.0) * 100).rounded() / 100
+        let roundedYearSpending = (totalYearSpending * 100).rounded() / 100
+        let roundedYearSavings = (totalYearSavings * 100).rounded() / 100
 
         let snapshot = PeriodSnapshot(
             year: year,
             month: nil,
-            monthlyTakeHome: annualTakeHome,
-            totalSpending: totalSpending,
-            savings: savings,
+            monthlyTakeHome: roundedAnnualTakeHome,
+            totalSpending: roundedYearSpending,
+            savings: roundedYearSavings,
             budgetPlanId: budgetPlanId,
             createdAt: Date(),
-            transactionCount: yearTransactions.count
+            expenseTransactionCount: yearTransactions.filter { $0.isExpense }.count,
+            incomeTransactionCount: yearTransactions.filter { !$0.isExpense }.count
         )
 
         // Save to local storage first
@@ -118,7 +234,7 @@ class SnapshotService: ObservableObject {
 
         // Save to Firebase
         do {
-            let firebaseId = try await BackendService.shared.createSnapshot(snapshot)
+            _ = try await BackendService.shared.createSnapshot(snapshot)
         } catch {
             print("❌ [SnapshotService] Failed to save yearly snapshot: \(error)")
             // Continue anyway - local storage succeeded
