@@ -313,12 +313,8 @@ class MonthEndBalancingService: ObservableObject {
             targetDate: lastDayOfMonth
         )
 
-        // Calculate diffSpending from category balances (sum of savings minus deficits)
-        // This ensures the net savings/deficit matches the category breakdown
-        // Round to 2 decimal places to avoid floating point precision issues
-        let diffSpendingRaw = categoryBalances.reduce(0.0) {
-            $0 + ($1.budgetAmount - $1.actualSpending)
-        }
+        // Net savings = actual income - actual expenses (regardless of budget allocation coverage)
+        let diffSpendingRaw = totalIncome - totalSpending
         let diffSpending = (diffSpendingRaw * 100).rounded() / 100
 
         // Calculate fund/debt allocations for this month
