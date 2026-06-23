@@ -9,7 +9,7 @@ from typing import Dict
 
 from google.cloud import firestore
 
-from services.email_parser import DiscoverEmailParser
+from services.email_parser import PARSERS
 from services.firestore_service import FirestoreService
 from services.gmail_service import GmailService
 
@@ -22,7 +22,6 @@ class PubSubHandler:
     ):
         self.gmail_service = gmail_service
         self.db = firestore_service
-        self.parser = DiscoverEmailParser()
 
     def process_notification(self, pubsub_message: Dict) -> Dict:
         """
@@ -282,8 +281,11 @@ class PubSubHandler:
             subject = headers.get("subject", "")
             from_email = headers.get("from", "")
 
-            # Check if it's a transaction alert
-            if not self.parser.is_discover_transaction_alert(subject, from_email):
+            # Find a parser that handles this email
+            parser = next(
+                (p for p in PARSERS if p.matches(subject, from_email)), None
+            )
+            if not parser:
                 return None
 
             print(
@@ -294,7 +296,7 @@ class PubSubHandler:
             body = self.gmail_service.get_message_body(message)
 
             # Parse transaction
-            transaction_data = self.parser.parse_transaction(body)
+            transaction_data = parser.parse_transaction(body)
             if not transaction_data:
                 print(
                     f"⚠️ [PubSub Handler] Failed to parse transaction from {message_id}"

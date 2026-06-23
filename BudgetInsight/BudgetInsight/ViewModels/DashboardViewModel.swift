@@ -11,6 +11,7 @@ class DashboardViewModel: NSObject, ObservableObject {
     @Published var isLoading: Bool = false
     @Published var transactions: [Transaction] = []
     @Published var errorMessage: String?
+    @Published var gmailAuthFailed: Bool = false
 
     private let storageService = TransactionStorageService.shared
     private let budgetService = BudgetService.shared
@@ -38,6 +39,23 @@ class DashboardViewModel: NSObject, ObservableObject {
 
         budgetService.$categorySpending
             .assign(to: &$categorySpending)
+
+        // Mirror Gmail auth failure state for the banner
+        GmailAuthService.shared.$isAuthFailed
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$gmailAuthFailed)
+
+        // Trigger re-auth when user taps the push notification
+        GmailAuthService.shared.$pendingReconnect
+            .filter { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                GmailAuthService.shared.pendingReconnect = false
+                Task { [weak self] in
+                    await self?.connectGmail()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func loadLocalData() {
@@ -231,6 +249,7 @@ class DashboardViewModel: NSObject, ObservableObject {
                         // Parse callback URL to check for success/error
                         if callbackURL.absoluteString.contains("gmail-connected") {
                             print("✅ [DashboardViewModel] Gmail connected successfully!")
+                            GmailAuthService.shared.markReconnected()
                         } else if callbackURL.absoluteString.contains("gmail-error") {
                             print("❌ [DashboardViewModel] Gmail connection failed")
                         }

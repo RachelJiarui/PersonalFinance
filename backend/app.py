@@ -507,10 +507,17 @@ def create_snapshot():
 
 @app.route("/api/gmail/auth/status", methods=["GET"])
 def gmail_auth_status():
-    """Check if Gmail is authenticated"""
+    """
+    Check if Gmail credentials are valid by actually validating with Google.
+
+    Returns:
+        - authenticated: bool - True if credentials are valid and working
+        - error_code: str or null - Error code if not authenticated:
+          'NO_CREDENTIALS', 'REVOKED', 'REFRESH_FAILED', 'API_ERROR'
+    """
     try:
-        is_authenticated = gmail_service.is_authenticated()
-        return jsonify({"authenticated": is_authenticated}), 200
+        is_valid, error_code = gmail_service.validate_credentials()
+        return jsonify({"authenticated": is_valid, "error_code": error_code}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

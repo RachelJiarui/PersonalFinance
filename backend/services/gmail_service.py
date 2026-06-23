@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
+from google.auth import exceptions as auth_exceptions
 from google.cloud import firestore
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -120,6 +121,60 @@ class GmailService:
         """Check if user has valid Gmail credentials"""
         credentials = self._load_credentials()
         return credentials is not None
+
+    def validate_credentials(self) -> Tuple[bool, Optional[str]]:
+        """
+        Actively validate credentials by attempting to refresh and make a lightweight API call.
+
+        Returns:
+            Tuple of (is_valid, error_code)
+            - is_valid: True if credentials are valid and working
+            - error_code: None if valid, otherwise one of:
+              'NO_CREDENTIALS', 'REVOKED', 'REFRESH_FAILED', 'API_ERROR'
+        """
+        credentials = self._load_credentials()
+        if not credentials:
+            return False, "NO_CREDENTIALS"
+
+        try:
+            from google.auth.transport.requests import Request
+
+            # Always force a refresh to exercise the refresh token, not just the
+            # access token. A stale access token can still pass a getProfile call
+            # even after the refresh token has been revoked, giving a false green light.
+            if credentials.refresh_token:
+                credentials.refresh(Request())
+
+                token_data = {
+                    "token": credentials.token,
+                    "refresh_token": credentials.refresh_token,
+                    "token_uri": credentials.token_uri,
+                    "client_id": credentials.client_id,
+                    "client_secret": credentials.client_secret,
+                    "scopes": list(credentials.scopes) if credentials.scopes else [],
+                    "expiry": credentials.expiry.isoformat()
+                    if credentials.expiry
+                    else None,
+                }
+                self._save_credentials(token_data)
+            else:
+                return False, "NO_CREDENTIALS"
+
+            # Confirm the fresh token works
+            service = build("gmail", "v1", credentials=credentials)
+            service.users().getProfile(userId="me").execute()
+
+            return True, None
+
+        except auth_exceptions.RefreshError as e:
+            error_str = str(e).lower()
+            print(f"⚠️ [Gmail] Refresh error: {e}")
+            if "revoked" in error_str or "invalid_grant" in error_str:
+                return False, "REVOKED"
+            return False, "REFRESH_FAILED"
+        except Exception as e:
+            print(f"⚠️ [Gmail] Validation error: {e}")
+            return False, "API_ERROR"
 
     def get_gmail_service(self):
         """Get authenticated Gmail API service"""

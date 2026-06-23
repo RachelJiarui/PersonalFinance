@@ -1285,6 +1285,21 @@ class BackendService: ObservableObject {
             throw BackendError.invalidResponse
         }
     }
+
+    // MARK: - Gmail Auth Status
+
+    func checkGmailAuthStatus() async throws -> GmailAuthStatusResponse {
+        let url = URL(string: "\(baseURL)/gmail/auth/status")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw BackendError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(GmailAuthStatusResponse.self, from: data)
+    }
 }
 
 // MARK: - Response Models
@@ -1294,6 +1309,16 @@ struct GmailAuthResponse: Codable {
 
     enum CodingKeys: String, CodingKey {
         case authUrl = "auth_url"
+    }
+}
+
+struct GmailAuthStatusResponse: Codable {
+    let authenticated: Bool
+    let errorCode: String?
+
+    enum CodingKeys: String, CodingKey {
+        case authenticated
+        case errorCode = "error_code"
     }
 }
 

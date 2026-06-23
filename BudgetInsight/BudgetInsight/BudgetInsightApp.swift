@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct BudgetInsightApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) var scenePhase
+
     init() {
         // Migrate data to shared container on first launch
         SharedUserDefaults.migrateToSharedContainer()
@@ -13,6 +16,11 @@ struct BudgetInsightApp: App {
                 .onOpenURL { url in
                     handleIncomingURL(url)
                 }
+                .onChange(of: scenePhase) { newPhase in
+                    if newPhase == .active {
+                        handleAppBecameActive()
+                    }
+                }
         }
     }
 
@@ -21,19 +29,28 @@ struct BudgetInsightApp: App {
 
         switch url.host {
         case "gmail-connected":
-            print("✅ Gmail successfully connected!")
-        // Could show a success toast here
+            print("Gmail successfully connected!")
+            GmailAuthService.shared.markReconnected()
 
         case "gmail-error":
             if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                 let message = components.queryItems?.first(where: { $0.name == "message" })?.value
             {
-                print("❌ Gmail connection error: \(message)")
-                // Could show an error alert here
+                print("Gmail connection error: \(message)")
             }
 
         default:
-            print("⚠️ Unknown URL: \(url)")
+            print("Unknown URL: \(url)")
         }
+    }
+
+    private func handleAppBecameActive() {
+        // Check Gmail auth status when app becomes active
+        Task {
+            await GmailAuthService.shared.checkAndNotifyIfNeeded()
+        }
+
+        // Clear badge when app is opened
+        GmailAuthService.shared.clearBadge()
     }
 }

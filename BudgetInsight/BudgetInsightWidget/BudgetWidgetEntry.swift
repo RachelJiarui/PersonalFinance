@@ -63,6 +63,11 @@ struct BudgetWidgetProvider: TimelineProvider {
     func getTimeline(
         in context: Context, completion: @escaping (Timeline<BudgetWidgetEntry>) -> Void
     ) {
+        // Check Gmail auth status in background (fire-and-forget)
+        Task {
+            await checkGmailAuthStatus()
+        }
+
         let entry = createEntry()
 
         // Refresh every 15 minutes
@@ -70,6 +75,34 @@ struct BudgetWidgetProvider: TimelineProvider {
         let timeline = Timeline(entries: [entry], policy: .after(refreshDate))
 
         completion(timeline)
+    }
+
+    /// Check Gmail auth status and store result in shared UserDefaults
+    /// This allows the main app to detect auth failures even when not running
+    private func checkGmailAuthStatus() async {
+        guard
+            let url = URL(
+                string:
+                    "https://budgetinsight-backend-575183170824.us-central1.run.app/api/gmail/auth/status"
+            )
+        else { return }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                httpResponse.statusCode == 200
+            else { return }
+
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let authenticated = json["authenticated"] as? Bool
+            {
+                // Store auth failure flag in shared container for main app to read
+                SharedUserDefaults.shared.set(!authenticated, forKey: "gmail_auth_failed")
+            }
+        } catch {
+            // Silently fail - widget shouldn't crash on network errors
+        }
     }
 
     /// Create widget entry from current budget data

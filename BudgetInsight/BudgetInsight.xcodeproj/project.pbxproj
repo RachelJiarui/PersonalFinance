@@ -27,6 +27,7 @@
 		4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE3D54C69884491F123DF6B /* DebtDetailView.swift */; };
 		879C74220C88B0CF078C4BC0 /* PerennialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E0DAAE7F3A4695195AF185 /* PerennialView.swift */; };
 		91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */; };
+		APPDEL001F2APPDEL /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPDEL002F2APPDEL /* AppDelegate.swift */; };
 		CC5437AC2F08344D0083C0D9 /* HistoricalBudgetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */; };
 		CC5437AE2F08A7450083C0D9 /* CategoryTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5437AD2F08A7450083C0D9 /* CategoryTransactionsView.swift */; };
 		CC5437B62F08CC430083C0D9 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC5437B52F08CC430083C0D9 /* WidgetKit.framework */; };
@@ -69,6 +70,7 @@
 		CCF2FC4D2F0641E700DC07DC /* CategoryBalance.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF2FC4C2F0641E700DC07DC /* CategoryBalance.swift */; };
 		CCF2FC4F2F0641FC00DC07DC /* MonthEndBalancingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF2FC4E2F0641FC00DC07DC /* MonthEndBalancingViewModel.swift */; };
 		CF8860D17823D2D67FC6BE07 /* FundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA4D4D040B401A2E2324017C /* FundService.swift */; };
+		GMAIL0001F2GMAIL /* GmailAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = GMAIL0002F2GMAIL /* GmailAuthService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +116,7 @@
 		92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllocationService.swift; sourceTree = "<group>"; };
 		A7AAF4163D8BBD77E2A153FD /* FundDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundDetailView.swift; sourceTree = "<group>"; };
 		ABE3D54C69884491F123DF6B /* DebtDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtDetailView.swift; sourceTree = "<group>"; };
+		APPDEL002F2APPDEL /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BA4D4D040B401A2E2324017C /* FundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundService.swift; sourceTree = "<group>"; };
 		BE78E7916D7B97B1AC7FD227 /* MonthEndBalancingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingView.swift; sourceTree = "<group>"; };
 		CC5437AB2F08344C0083C0D9 /* HistoricalBudgetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoricalBudgetDetailView.swift; sourceTree = "<group>"; };
@@ -157,6 +160,7 @@
 		CCF2FC4E2F0641FC00DC07DC /* MonthEndBalancingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthEndBalancingViewModel.swift; sourceTree = "<group>"; };
 		D4B2BE150C85F672A42D4B73 /* TransactionAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionAllocation.swift; sourceTree = "<group>"; };
 		DF9DBF7F264C2F518E52B125 /* DebtService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtService.swift; sourceTree = "<group>"; };
+		GMAIL0002F2GMAIL /* GmailAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GmailAuthService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -189,6 +193,7 @@
 				CCA4CD502F08E4060066034F /* BudgetInsight.entitlements */,
 				CC5437EA2F08CDA80083C0D9 /* Utilities */,
 				1A000002 /* BudgetInsightApp.swift */,
+				APPDEL002F2APPDEL /* AppDelegate.swift */,
 				1A00001D /* Models */,
 				1A00001E /* Views */,
 				1A00001F /* ViewModels */,
@@ -276,6 +281,7 @@
 				BA4D4D040B401A2E2324017C /* FundService.swift */,
 				DF9DBF7F264C2F518E52B125 /* DebtService.swift */,
 				92BA0EBBD9009CE02A0CC43E /* AllocationService.swift */,
+				GMAIL0002F2GMAIL /* GmailAuthService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -490,6 +496,8 @@
 				4ED36309FA7E70E345CCFA57 /* DebtDetailView.swift in Sources */,
 				91633780F11A36DA7BAC8026 /* MonthEndBalancingView.swift in Sources */,
 				CC5437EB2F08CDA80083C0D9 /* SharedUserDefaults.swift in Sources */,
+				GMAIL0001F2GMAIL /* GmailAuthService.swift in Sources */,
+				APPDEL001F2APPDEL /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -551,6 +559,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = BudgetInsight/BudgetInsight.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -589,6 +598,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -632,6 +642,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = BudgetInsight/BudgetInsight.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -663,6 +674,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -679,6 +691,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = BudgetInsightWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = WP7LUUC385;
@@ -703,6 +716,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app.BudgetInsightWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -721,6 +735,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = BudgetInsightWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = WP7LUUC385;
@@ -745,6 +760,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.budgetinsight.app.BudgetInsightWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

@@ -6,8 +6,29 @@ struct DashboardView: View {
     @State private var showManualEntry = false
     @State private var showTransactionAlerts = false
     @State private var dashboardTask: Task<Void, Never>?
+    @State private var bannerVisible = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            if bannerVisible && viewModel.gmailAuthFailed {
+                GmailDisconnectedBanner {
+                    Task { await viewModel.connectGmail() }
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            gmailContent
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    bannerVisible = true
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var gmailContent: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 24) {
@@ -219,5 +240,35 @@ struct EmptyBudgetView: View {
                 .padding(.horizontal)
         }
         .padding(.vertical, 40)
+    }
+}
+
+struct GmailDisconnectedBanner: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "envelope.badge.fill")
+                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Gmail Disconnected")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                    Text("Tap to reconnect")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.orange)
+        }
+        .buttonStyle(.plain)
     }
 }
