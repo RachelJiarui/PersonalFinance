@@ -16,6 +16,10 @@ struct DashboardView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
+            if viewModel.unallocatedIncome > 0.01 {
+                UnallocatedIncomeBanner(amount: viewModel.unallocatedIncome)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             gmailContent
         }
         .onAppear {
@@ -240,6 +244,38 @@ struct EmptyBudgetView: View {
                 .padding(.horizontal)
         }
         .padding(.vertical, 40)
+    }
+}
+
+struct UnallocatedIncomeBanner: View {
+    let amount: Double
+
+    private var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "$"
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "dollarsign.circle.fill")
+                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(formattedAmount) unallocated")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                Text("Income this month not yet assigned to a budget bucket")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.85))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.blue)
     }
 }
 

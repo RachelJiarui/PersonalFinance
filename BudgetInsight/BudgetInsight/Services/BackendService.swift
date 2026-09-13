@@ -6,7 +6,6 @@ class BackendService: ObservableObject {
 
     // Backend URL
     private let baseURL: String
-
     @Published var isConnected: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
@@ -22,11 +21,17 @@ class BackendService: ObservableObject {
         print("🌐 [BackendService] Initialized with base URL: \(self.baseURL)")
     }
 
+    private func apiRequest(_ url: URL, method: String = "GET") -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        return request
+    }
+
     // MARK: - Health Check
 
     func checkHealth() async throws -> Bool {
         let url = URL(string: "\(baseURL.replacingOccurrences(of: "/api", with: ""))/health")!
-        let (_, response) = try await URLSession.shared.data(from: url)
+        let (_, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -41,7 +46,7 @@ class BackendService: ObservableObject {
 
     func fetchTransactions() async throws -> [Transaction] {
         let url = URL(string: "\(baseURL)/transactions")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -89,8 +94,7 @@ class BackendService: ObservableObject {
 
     func createTransaction(_ transaction: Transaction) async throws -> String {
         let url = URL(string: "\(baseURL)/transactions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -141,8 +145,7 @@ class BackendService: ObservableObject {
 
     func updateTransaction(transactionId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -157,8 +160,7 @@ class BackendService: ObservableObject {
 
     func deleteTransaction(_ transactionId: String) async throws {
         let url = URL(string: "\(baseURL)/transactions/\(transactionId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -173,7 +175,7 @@ class BackendService: ObservableObject {
 
     func fetchBudgetCategories() async throws -> [BudgetCategory] {
         let url = URL(string: "\(baseURL)/budget-categories")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -215,8 +217,7 @@ class BackendService: ObservableObject {
 
     func createBudgetCategory(_ category: BudgetCategory) async throws -> String {
         let url = URL(string: "\(baseURL)/budget-categories")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
@@ -263,8 +264,7 @@ class BackendService: ObservableObject {
 
     func updateBudgetCategory(categoryId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/budget-categories/\(categoryId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -279,8 +279,7 @@ class BackendService: ObservableObject {
 
     func deleteBudgetCategory(_ categoryId: String) async throws {
         let url = URL(string: "\(baseURL)/budget-categories/\(categoryId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -295,7 +294,7 @@ class BackendService: ObservableObject {
 
     func fetchActiveBudgetPlan() async throws -> BudgetPlan? {
         let url = URL(string: "\(baseURL)/budget-plans/active")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendError.invalidResponse
@@ -314,7 +313,7 @@ class BackendService: ObservableObject {
 
     func fetchBudgetPlanForDate(_ dateString: String) async throws -> BudgetPlan? {
         let url = URL(string: "\(baseURL)/budget-plans/for-date/\(dateString)")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendError.invalidResponse
@@ -374,8 +373,7 @@ class BackendService: ObservableObject {
 
     func createBudgetPlan(_ plan: BudgetPlan) async throws -> String {
         let url = URL(string: "\(baseURL)/budget-plans")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -448,8 +446,7 @@ class BackendService: ObservableObject {
 
     func updateBudgetPlan(planId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/budget-plans/\(planId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -464,7 +461,7 @@ class BackendService: ObservableObject {
 
     func fetchBudgetPlan(planId: String) async throws -> BudgetPlan? {
         let url = URL(string: "\(baseURL)/budget-plans/\(planId)")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendError.invalidResponse
@@ -486,7 +483,7 @@ class BackendService: ObservableObject {
     func fetchFunds() async throws -> [Fund] {
         let url = URL(string: "\(baseURL)/funds")!
         print("🔗 [BackendService] Fetching funds from: \(url.absoluteString)")
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -554,8 +551,7 @@ class BackendService: ObservableObject {
 
     func createFund(_ fund: Fund) async throws -> String {
         let url = URL(string: "\(baseURL)/funds")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -597,8 +593,7 @@ class BackendService: ObservableObject {
 
     func updateFund(fundId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/funds/\(fundId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -613,8 +608,7 @@ class BackendService: ObservableObject {
 
     func deleteFund(_ fundId: String) async throws {
         let url = URL(string: "\(baseURL)/funds/\(fundId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -630,7 +624,7 @@ class BackendService: ObservableObject {
     func fetchDebts() async throws -> [Debt] {
         let url = URL(string: "\(baseURL)/debts")!
         print("🔗 [BackendService] Fetching debts from: \(url.absoluteString)")
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -698,8 +692,7 @@ class BackendService: ObservableObject {
 
     func createDebt(_ debt: Debt) async throws -> String {
         let url = URL(string: "\(baseURL)/debts")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -739,8 +732,7 @@ class BackendService: ObservableObject {
 
     func updateDebt(debtId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/debts/\(debtId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -755,8 +747,7 @@ class BackendService: ObservableObject {
 
     func deleteDebt(_ debtId: String) async throws {
         let url = URL(string: "\(baseURL)/debts/\(debtId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -792,7 +783,7 @@ class BackendService: ObservableObject {
 
         let url = URL(string: urlString)!
         print("🔗 [BackendService] Fetching allocations from: \(urlString)")
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -849,8 +840,7 @@ class BackendService: ObservableObject {
 
     func createAllocation(_ allocation: TransactionAllocation) async throws -> String {
         let url = URL(string: "\(baseURL)/allocations")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -883,8 +873,7 @@ class BackendService: ObservableObject {
 
     func updateAllocation(allocationId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/allocations/\(allocationId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -899,8 +888,7 @@ class BackendService: ObservableObject {
 
     func deleteAllocation(_ allocationId: String) async throws {
         let url = URL(string: "\(baseURL)/allocations/\(allocationId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -915,7 +903,7 @@ class BackendService: ObservableObject {
 
     func fetchSnapshots(periodType: String = "monthly") async throws -> [PeriodSnapshot] {
         let url = URL(string: "\(baseURL)/snapshots?type=\(periodType)")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -1063,8 +1051,7 @@ class BackendService: ObservableObject {
 
     func createSnapshot(_ snapshot: PeriodSnapshot) async throws -> String {
         let url = URL(string: "\(baseURL)/snapshots")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let dateFormatter = ISO8601DateFormatter()
@@ -1107,8 +1094,7 @@ class BackendService: ObservableObject {
 
     func registerUser(email: String) async throws -> String {
         let url = URL(string: "\(baseURL)/users/register")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = ["email": email]
@@ -1144,8 +1130,7 @@ class BackendService: ObservableObject {
         }
 
         let url = URL(string: "\(baseURL)/api/month-end-balances")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = apiRequest(url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(balance)
 
@@ -1176,7 +1161,7 @@ class BackendService: ObservableObject {
         let url = URL(string: "\(baseURL)/gmail/auth/start")!
         print("📧 [BackendService] Request URL: \(url.absoluteString)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ [BackendService] Invalid response type")
@@ -1204,7 +1189,7 @@ class BackendService: ObservableObject {
 
     func fetchTransactionAlerts() async throws -> [TransactionAlert] {
         let url = URL(string: "\(baseURL)/transaction-alerts")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
@@ -1258,8 +1243,7 @@ class BackendService: ObservableObject {
 
     func updateTransactionAlert(alertId: String, updates: [String: Any]) async throws {
         let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = apiRequest(url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: updates)
 
@@ -1274,8 +1258,7 @@ class BackendService: ObservableObject {
 
     func deleteTransactionAlert(alertId: String) async throws {
         let url = URL(string: "\(baseURL)/transaction-alerts/\(alertId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = apiRequest(url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -1290,7 +1273,7 @@ class BackendService: ObservableObject {
 
     func checkGmailAuthStatus() async throws -> GmailAuthStatusResponse {
         let url = URL(string: "\(baseURL)/gmail/auth/status")!
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: apiRequest(url))
 
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200

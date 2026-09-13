@@ -544,7 +544,7 @@ struct AllocateBalanceView: View {
                 AddAllocationViewExcludingSource(
                     transactionAmount: balanceAmount,
                     currentAllocations: allocations,
-                    isExpense: false,  // Balance transfers are income to destinations
+                    isExpense: balanceType == "Debt",  // Debt payoff is expense to destinations; fund transfer is income
                     excludeType: balanceType == "Fund" ? .fund : .debt,
                     excludeId: sourceId,
                     onAdd: { newAllocation in

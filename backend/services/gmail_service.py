@@ -72,8 +72,6 @@ class GmailService:
             "token": credentials.token,
             "refresh_token": credentials.refresh_token,
             "token_uri": credentials.token_uri,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
             "scopes": credentials.scopes,
             "expiry": credentials.expiry.isoformat() if credentials.expiry else None,
         }
@@ -109,8 +107,8 @@ class GmailService:
             token=token_data.get("token"),
             refresh_token=token_data.get("refresh_token"),
             token_uri=token_data.get("token_uri"),
-            client_id=token_data.get("client_id"),
-            client_secret=token_data.get("client_secret"),
+            client_id=self.client_id,
+            client_secret=self.client_secret,
             scopes=token_data.get("scopes"),
             expiry=expiry,
         )
@@ -149,8 +147,6 @@ class GmailService:
                     "token": credentials.token,
                     "refresh_token": credentials.refresh_token,
                     "token_uri": credentials.token_uri,
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
                     "scopes": list(credentials.scopes) if credentials.scopes else [],
                     "expiry": credentials.expiry.isoformat()
                     if credentials.expiry
@@ -195,8 +191,6 @@ class GmailService:
                 "token": credentials.token,
                 "refresh_token": credentials.refresh_token,
                 "token_uri": credentials.token_uri,
-                "client_id": credentials.client_id,
-                "client_secret": credentials.client_secret,
                 "scopes": credentials.scopes,
                 "expiry": credentials.expiry.isoformat()
                 if credentials.expiry

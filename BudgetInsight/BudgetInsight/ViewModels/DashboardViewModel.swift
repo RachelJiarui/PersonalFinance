@@ -12,6 +12,7 @@ class DashboardViewModel: NSObject, ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var errorMessage: String?
     @Published var gmailAuthFailed: Bool = false
+    @Published var unallocatedIncome: Double = 0
 
     private let storageService = TransactionStorageService.shared
     private let budgetService = BudgetService.shared
@@ -44,6 +45,17 @@ class DashboardViewModel: NSObject, ObservableObject {
         GmailAuthService.shared.$isAuthFailed
             .receive(on: DispatchQueue.main)
             .assign(to: &$gmailAuthFailed)
+
+        // Recalculate unallocated income whenever transactions or allocations change
+        Publishers.CombineLatest(
+            storageService.$transactions,
+            AllocationService.shared.$allocations
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] transactions, allocations in
+            self?.updateUnallocatedIncome(transactions: transactions, allocations: allocations)
+        }
+        .store(in: &cancellables)
 
         // Trigger re-auth when user taps the push notification
         GmailAuthService.shared.$pendingReconnect
@@ -294,6 +306,36 @@ class DashboardViewModel: NSObject, ObservableObject {
         budgetService.updateCategorySpending(with: storageService.transactions)
 
         print("✅ [DashboardViewModel] Synchronous update complete")
+    }
+
+    // MARK: - Unallocated Income
+
+    private func updateUnallocatedIncome(
+        transactions: [Transaction], allocations: [TransactionAllocation]
+    ) {
+        let calendar = Calendar.current
+        let now = Date()
+        let currentMonth = calendar.component(.month, from: now)
+        let currentYear = calendar.component(.year, from: now)
+
+        let incomeThisMonth = transactions.filter { tx in
+            !tx.isExpense
+                && calendar.component(.month, from: tx.date) == currentMonth
+                && calendar.component(.year, from: tx.date) == currentYear
+        }
+
+        var total = 0.0
+        for tx in incomeThisMonth {
+            let allocated = allocations
+                .filter { $0.transactionId == tx.id }
+                .reduce(0.0) { $0 + $1.amount }
+            let remainder = tx.amount - allocated
+            if remainder > 0.01 {
+                total += remainder
+            }
+        }
+
+        unallocatedIncome = total
     }
 
     // MARK: - Helper Methods

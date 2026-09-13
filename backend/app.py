@@ -18,8 +18,11 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
+CORS(app, origins=["https://personal-finance-482417.web.app"])
+secret_key = os.getenv("SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("SECRET_KEY environment variable must be set")
+app.config["SECRET_KEY"] = secret_key
 
 # Initialize services
 db = FirestoreService()

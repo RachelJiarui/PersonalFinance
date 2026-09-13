@@ -26,8 +26,6 @@ class SavorOneEmailParser(EmailParser):
                 )
 
             # All key data lives in one sentence in both the plain-text and HTML parts:
-            # "on Jun. 18, 2026, at CONTES BIKE SHOP LEXIN, a pending authorization
-            #  or purchase in the amount of $20.13 was placed or charged"
 
             merchant_match = re.search(
                 r"on\s+[A-Za-z]+\.?\s+\d{1,2},\s+\d{4},\s+at\s+(.+?),\s+a\s+pending",

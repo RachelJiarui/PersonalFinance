@@ -34,6 +34,7 @@ Pods/
 # Secrets
 *secret*
 *Secret*
+**/Secrets.xcconfig
 credentials.json
 oauth_credentials.json
 token.pickle
