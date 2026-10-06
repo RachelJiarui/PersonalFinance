@@ -23,13 +23,17 @@ struct ContentView: View {
                 handleScenePhaseChange(newPhase)
             }
             .task {
-                // Check for unbalanced months on app launch
-                await balancingService.checkForUnbalancedMonths()
-                showBalancing = balancingService.needsBalancing
-
-                refreshTask = Task {
+                // Sync the authoritative transaction list from the backend first —
+                // checking for unbalanced months against the stale local cache can
+                // miss recent transactions and leave the balancing flow stuck.
+                let task = Task {
                     await dashboardViewModel.refreshData()
                 }
+                refreshTask = task
+                await task.value
+
+                await balancingService.checkForUnbalancedMonths()
+                showBalancing = balancingService.needsBalancing
             }
             .onChange(of: balancingService.needsBalancing) { needsBalancing in
                 showBalancing = needsBalancing
@@ -44,12 +48,11 @@ struct ContentView: View {
         switch phase {
         case .active:
             print("🔄 [ContentView] App became active")
-            // Re-check balancing on app return
-            Task {
-                await balancingService.checkForUnbalancedMonths()
-            }
+            // Re-check balancing on app return, after syncing transactions first
+            // so the check doesn't run against a stale local cache.
             Task {
                 await dashboardViewModel.refreshData()
+                await balancingService.checkForUnbalancedMonths()
             }
 
         case .inactive:

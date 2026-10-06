@@ -275,13 +275,7 @@ class MonthEndBalancingService: ObservableObject {
     // MARK: - Statistics Calculation
 
     func calculateMonthStats(year: Int, month: Int) async -> MonthWrappedStats? {
-        // Get transactions for this month
         let monthTransactions = getTransactionsForMonth(year: year, month: month)
-
-        guard !monthTransactions.isEmpty else {
-            print("⚠️ [BalancingService] No transactions for \(monthName(month)) \(year)")
-            return nil
-        }
 
         // Get monthly take-home (use budget plan active at end of month)
         let lastDayOfMonth = getLastDayOfMonth(year: year, month: month)
@@ -313,8 +307,10 @@ class MonthEndBalancingService: ObservableObject {
             targetDate: lastDayOfMonth
         )
 
-        // Net savings = actual income - actual expenses (regardless of budget allocation coverage)
-        let diffSpendingRaw = totalIncome - totalSpending
+        // Net savings = budgeted take-home (from annual salary in the budget plan) - actual expenses.
+        // Using totalIncome here would only count income transactions logged that month, which can
+        // miss/misalign paychecks and silently ignore the salary the user actually reports.
+        let diffSpendingRaw = monthlyTakeHome - totalSpending
         let diffSpending = (diffSpendingRaw * 100).rounded() / 100
 
         // Calculate fund/debt allocations for this month
